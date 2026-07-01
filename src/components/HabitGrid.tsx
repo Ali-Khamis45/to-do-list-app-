@@ -78,11 +78,11 @@ export default function HabitGrid({
     return `${year}-${formattedMonth}-${formattedDay}`;
   };
 
-  const getMonthNameArabic = (m: number): string => {
+  const getMonthName = (m: number): string => {
     const months = [
-      'يناير (January)', 'فبراير (February)', 'مارس (March)', 'أبريل (April)', 
-      'مايو (May)', 'يونيو (June)', 'يوليو (July)', 'أغسطس (August)', 
-      'سبتمبر (September)', 'أكتوبر (October)', 'نوفمبر (November)', 'ديسمبر (December)'
+      'January', 'February', 'March', 'April', 
+      'May', 'June', 'July', 'August', 
+      'September', 'October', 'November', 'December'
     ];
     return months[m];
   };
@@ -110,7 +110,7 @@ export default function HabitGrid({
             <Calendar className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="font-semibold text-lg text-stone-900">مخطط العادات الشهري</h2>
+            <h2 className="font-semibold text-lg text-stone-900">Monthly To Do List</h2>
             <p className="text-xs text-stone-400 font-medium">Monthly Habit Grid</p>
           </div>
         </div>
@@ -122,7 +122,7 @@ export default function HabitGrid({
             <ChevronLeft className="w-4 h-4" />
           </button>
           <span className="font-medium text-xs text-stone-700 px-3 min-w-[130px] text-center">
-            {getMonthNameArabic(month)} {year}
+            {getMonthName(month)} {year}
           </span>
           <button 
             onClick={onNextMonth}
@@ -138,7 +138,7 @@ export default function HabitGrid({
         <div className="min-w-[950px] space-y-1">
           {/* Header Row (Days of month) */}
           <div className="flex items-center h-10 border-b border-stone-100 font-semibold text-xs text-stone-400 select-none">
-            <div className="w-[160px] pl-2 text-stone-500">العادة • Habit</div>
+            <div className="w-[160px] pl-2 text-stone-500">Habit</div>
             <div className="flex-1 grid gap-px" style={{ gridTemplateColumns: 'repeat(31, minmax(0, 1fr))' }}>
               {Array.from({ length: 31 }).map((_, idx) => {
                 const dayNum = idx + 1;
@@ -167,8 +167,8 @@ export default function HabitGrid({
           {habits.length === 0 ? (
             <div className="py-8 text-center text-stone-400 text-sm flex flex-col items-center justify-center gap-2">
               <Calendar className="w-8 h-8 text-stone-300 stroke-1" />
-              <span>لا توجد عادات حالية. اضغط على "New Task" في القائمة لإضافة واحدة!</span>
-              <span className="text-xs text-stone-400 font-mono">No habits created. Create one from the sidebar button.</span>
+              <span>No active habits found.</span>
+              <span className="text-xs text-stone-400 font-mono">Click the sidebar button to create your first habit.</span>
             </div>
           ) : (
             habits.map((habit) => {
@@ -187,7 +187,7 @@ export default function HabitGrid({
                     <button
                       onClick={() => onDeleteHabit(habit.id)}
                       className="p-1 text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ml-1 rounded-md hover:bg-red-50"
-                      title="حذف العادة"
+                      title="Delete Habit"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -231,18 +231,18 @@ export default function HabitGrid({
       <div className="mt-5 flex flex-wrap items-center gap-6 pt-4 border-t border-stone-100 text-xs text-stone-500 font-medium">
         <div className="flex items-center gap-2">
           <CheckCircle className="w-4 h-4 text-stone-900 fill-stone-100" />
-          <span>مكتمل (Completed)</span>
+          <span>Completed</span>
         </div>
         <div className="flex items-center gap-2">
           <XCircle className="w-4 h-4 text-red-600 fill-red-50" />
-          <span>غير مكتمل (Missed)</span>
+          <span>Missed</span>
         </div>
         <div className="flex items-center gap-2">
           <MinusCircle className="w-4 h-4 text-stone-400 fill-stone-50" />
-          <span>نصف مكتمل (Half-Done)</span>
+          <span>Half Completed</span>
         </div>
         <div className="text-stone-300 select-none">|</div>
-        <div className="text-stone-400 italic">💡 انقر على خلايا الجدول لتغيير حالة الإنجاز اليومي.</div>
+        <div className="text-stone-400 italic">💡 Click on grid cells to cycle through completion states.</div>
       </div>
     </div>
   );

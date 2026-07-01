@@ -45,7 +45,7 @@ export default function TaskList({
       {/* Title */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-base text-stone-900 flex items-center gap-2">
-          مهام اليوم 
+          Today's Tasks
           <span className="text-[10px] font-normal text-stone-500 bg-stone-50 px-2.5 py-0.5 rounded-full border border-stone-100 font-mono">
             ({remainingCount} remaining)
           </span>
@@ -53,7 +53,7 @@ export default function TaskList({
         <button
           onClick={() => setIsQuickAddOpen(!isQuickAddOpen)}
           className="p-1.5 text-stone-900 hover:bg-stone-100 rounded-xl transition-colors"
-          title="إضافة سريعة لمهمة"
+          title="Quick Add Task"
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -65,7 +65,7 @@ export default function TaskList({
           <input
             type="text"
             required
-            placeholder="عنوان المهمة..."
+            placeholder="Task title..."
             value={quickTitle}
             onChange={(e) => setQuickTitle(e.target.value)}
             className="w-full text-xs px-2.5 py-1.5 border border-stone-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-stone-900 bg-white"
@@ -80,7 +80,7 @@ export default function TaskList({
             />
             <input
               type="text"
-              placeholder="التفاصيل (مثال: Leg day)..."
+              placeholder="Details (e.g. Leg day)..."
               value={quickSubtext}
               onChange={(e) => setQuickSubtext(e.target.value)}
               className="w-full text-xs px-2.5 py-1.5 border border-stone-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-stone-900 bg-white"
@@ -92,13 +92,13 @@ export default function TaskList({
               onClick={() => setIsQuickAddOpen(false)}
               className="text-[10px] px-2.5 py-1 text-stone-500 hover:bg-stone-100 rounded-lg"
             >
-              إلغاء
+              Cancel
             </button>
             <button
               type="submit"
               className="text-[10px] px-3 py-1 bg-stone-900 hover:bg-stone-800 text-white font-medium rounded-lg"
             >
-              حفظ
+              Save
             </button>
           </div>
         </form>
@@ -109,12 +109,12 @@ export default function TaskList({
         {filteredTasks.length === 0 ? (
           <div className="py-8 text-center text-stone-400 text-sm flex flex-col items-center justify-center gap-1.5 border border-dashed border-stone-200 rounded-xl">
             <FileText className="w-7 h-7 text-stone-300 stroke-1" />
-            <span className="text-xs">لا توجد مهام مجدولة لهذا اليوم.</span>
+            <span className="text-xs">No tasks scheduled for today.</span>
             <button 
               onClick={() => setIsQuickAddOpen(true)}
               className="text-[10px] text-stone-900 font-semibold hover:underline"
             >
-              أضف مهمة الآن
+              Add a task now
             </button>
           </div>
         ) : (
@@ -135,7 +135,7 @@ export default function TaskList({
                     ? 'border-stone-900 bg-stone-900 text-white'
                     : 'border-stone-300 hover:border-stone-900 hover:bg-stone-100/30 cursor-pointer'
                 }`}
-                title={task.completed ? "تحديد كغير مكتمل" : "تحديد كمكتمل"}
+                title={task.completed ? "Mark as Incomplete" : "Mark as Complete"}
               >
                 {task.completed && <Check className="w-3 h-3 stroke-[3]" />}
               </button>
@@ -163,7 +163,7 @@ export default function TaskList({
                 <button
                   onClick={() => onDeleteTask(task.id)}
                   className="p-1 text-stone-300 hover:text-red-500 rounded-md hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="حذف المهمة"
+                  title="Delete Task"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

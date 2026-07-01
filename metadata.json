@@ -1,6 +1,6 @@
 {
-  "name": "Nexus Desktop",
-  "description": "An elite productivity dashboard and monthly habit tracking system designed to streamline your daily goals.",
+  "name": "To Do List",
+  "description": "An elegant, streamlined To Do List with task scheduling and habit tracking capabilities designed to help you stay organized and consistent.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

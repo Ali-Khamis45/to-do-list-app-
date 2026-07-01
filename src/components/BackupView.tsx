@@ -53,7 +53,7 @@ export default function BackupView({
         
         // Basic schema validation
         if (!parsed.habits || !Array.isArray(parsed.habits)) {
-          throw new Error("ملف النسخ الاحتياطي غير صالح (لا يحتوي على مصفوفة عادات)");
+          throw new Error("Invalid backup file format (missing habits array)");
         }
         
         onRestoreBackup({
@@ -64,14 +64,14 @@ export default function BackupView({
 
         setImportStatus({
           type: 'success',
-          message: 'تم استعادة النسخة الاحتياطية بنجاح! تم تحديث لوحة التحكم.'
+          message: 'Backup restored successfully! Dashboard updated.'
         });
         
         setTimeout(() => setImportStatus({ type: null, message: '' }), 5000);
       } catch (err) {
         setImportStatus({
           type: 'error',
-          message: 'فشل استيراد الملف. يرجى التأكد من أن الملف بصيغة JSON صالحة.'
+          message: 'Failed to import backup file. Please ensure it is a valid JSON file.'
         });
         setTimeout(() => setImportStatus({ type: null, message: '' }), 5000);
       }
@@ -87,7 +87,7 @@ export default function BackupView({
           <Database className="w-4 h-4" />
         </div>
         <div>
-          <h2 className="font-semibold text-sm text-stone-950">النسخ الاحتياطي والأرشفة</h2>
+          <h2 className="font-semibold text-sm text-stone-950">Database Backup & Recovery</h2>
           <p className="text-[10px] text-stone-400 font-medium">Backup & Data Recovery</p>
         </div>
       </div>
@@ -99,16 +99,16 @@ export default function BackupView({
             <div className="w-9 h-9 rounded-full bg-stone-100 text-stone-900 flex items-center justify-center">
               <Download className="w-4 h-4" />
             </div>
-            <h3 className="font-semibold text-xs text-stone-900 mt-3">تصدير البيانات (Export Data)</h3>
+            <h3 className="font-semibold text-xs text-stone-900 mt-3">Export Data</h3>
             <p className="text-[11px] text-stone-400 mt-1">
-              قم بتنزيل ملف النسخة الاحتياطية الذي يحتوي على جميع العادات والمهام وجلسات شدة التركيز الخاصة بك لحفظها محلياً.
+              Download a secure backup file containing all your habits, tasks, and focus sessions to keep locally.
             </p>
           </div>
           <button
             onClick={handleExport}
             className="w-full py-2 bg-stone-900 hover:bg-stone-800 text-white font-semibold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 shadow-xs"
           >
-            <Download className="w-4 h-4" /> تصدير نسخة احتياطية
+            <Download className="w-4 h-4" /> Export Backup
           </button>
         </div>
 
@@ -118,16 +118,16 @@ export default function BackupView({
             <div className="w-9 h-9 rounded-full bg-stone-100 text-stone-900 flex items-center justify-center">
               <Upload className="w-4 h-4" />
             </div>
-            <h3 className="font-semibold text-xs text-stone-900 mt-3">استيراد البيانات (Import Backup)</h3>
+            <h3 className="font-semibold text-xs text-stone-900 mt-3">Import Backup</h3>
             <p className="text-[11px] text-stone-400 mt-1">
-              قم بتحميل ملف نسخة احتياطية (.json) سابق لاستعادة بيانات العادات والمهام ومستويات التقدم والخطوط المتتالية الخاصة بك.
+              Upload a previously exported JSON backup file to restore all your habits, tasks, and consistency progress.
             </p>
           </div>
           <button
             onClick={handleImportClick}
             className="w-full py-2 border border-stone-200 hover:bg-stone-50 text-stone-700 font-semibold text-xs rounded-xl transition-colors flex items-center justify-center gap-2"
           >
-            <Upload className="w-4 h-4" /> استيراد ملف خارجي
+            <Upload className="w-4 h-4" /> Import Backup File
           </button>
           <input
             type="file"

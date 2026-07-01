@@ -95,7 +95,7 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
                   : 'text-stone-400 hover:text-stone-900'
               }`}
             >
-              مهمة جديدة
+              New Task
             </button>
             <button
               onClick={() => setActiveTab('habit')}
@@ -105,7 +105,7 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
                   : 'text-stone-400 hover:text-stone-900'
               }`}
             >
-              عادة جديدة
+              New Habit
             </button>
           </div>
           <button
@@ -120,11 +120,11 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
         {activeTab === 'task' ? (
           <form onSubmit={handleTaskSubmit} className="p-5 space-y-4">
             <div>
-              <label className="block text-[10px] font-semibold text-stone-400 mb-1">اسم المهمة</label>
+              <label className="block text-[10px] font-semibold text-stone-400 mb-1">Task Name</label>
               <input
                 type="text"
                 required
-                placeholder="أدخل عنوان المهمة..."
+                placeholder="Enter task title..."
                 value={taskTitle}
                 onChange={(e) => setTaskTitle(e.target.value)}
                 className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent transition-all"
@@ -133,7 +133,7 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] font-semibold text-stone-400 mb-1">الوقت</label>
+                <label className="block text-[10px] font-semibold text-stone-400 mb-1">Time</label>
                 <input
                   type="time"
                   required
@@ -143,7 +143,7 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-stone-400 mb-1">التاريخ</label>
+                <label className="block text-[10px] font-semibold text-stone-400 mb-1">Date</label>
                 <input
                   type="date"
                   required
@@ -155,10 +155,10 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold text-stone-400 mb-1">تفاصيل إضافية (اختياري)</label>
+              <label className="block text-[10px] font-semibold text-stone-400 mb-1">Additional Details (Optional)</label>
               <input
                 type="text"
-                placeholder="أدخل تفاصيل المهمة (مثال: Leg day focus)"
+                placeholder="Enter details (e.g. Focus on deep work)"
                 value={taskSubtext}
                 onChange={(e) => setTaskSubtext(e.target.value)}
                 className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent transition-all"
@@ -169,17 +169,17 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
               type="submit"
               className="w-full mt-4 bg-stone-900 hover:bg-stone-800 text-white font-semibold py-2 px-4 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2"
             >
-              <Check className="w-4 h-4" /> إضافة المهمة
+              <Check className="w-4 h-4" /> Add Task
             </button>
           </form>
         ) : (
           <form onSubmit={handleHabitSubmit} className="p-5 space-y-4">
             <div>
-              <label className="block text-[10px] font-semibold text-stone-400 mb-1">اسم العادة</label>
+              <label className="block text-[10px] font-semibold text-stone-400 mb-1">Habit Name</label>
               <input
                 type="text"
                 required
-                placeholder="أدخل اسم العادة..."
+                placeholder="Enter habit name..."
                 value={habitName}
                 onChange={(e) => setHabitName(e.target.value)}
                 className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent transition-all"
@@ -187,7 +187,7 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold text-stone-400 mb-1">اختر أيقونة</label>
+              <label className="block text-[10px] font-semibold text-stone-400 mb-1">Select Icon</label>
               <div className="grid grid-cols-6 gap-2 border border-stone-200/60 p-2 rounded-xl max-h-36 overflow-y-auto">
                 {HABIT_ICONS.map((iconObj) => {
                   const IconComponent = iconObj.component;
@@ -212,7 +212,7 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] font-semibold text-stone-400 mb-1">اللون</label>
+                <label className="block text-[10px] font-semibold text-stone-400 mb-1">Color</label>
                 <div className="flex gap-1.5 items-center py-2">
                   {COLOR_PRESETS.map((preset) => (
                     <button
@@ -231,7 +231,7 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-stone-400 mb-1">الهدف (بالأيام)</label>
+                <label className="block text-[10px] font-semibold text-stone-400 mb-1">Streak Goal (Days)</label>
                 <input
                   type="number"
                   min="1"
@@ -248,7 +248,7 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
               type="submit"
               className="w-full mt-4 bg-stone-900 hover:bg-stone-800 text-white font-semibold py-2 px-4 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2"
             >
-              <Check className="w-4 h-4" /> إضافة العادة
+              <Check className="w-4 h-4" /> Add Habit
             </button>
           </form>
         )}

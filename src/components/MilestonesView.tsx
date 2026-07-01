@@ -66,8 +66,8 @@ export default function MilestonesView({ habits }: MilestonesViewProps) {
     <div className="bg-white rounded-2xl border border-stone-200/60 p-6 flex flex-col shadow-xs">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-base text-stone-900 flex items-center gap-2">
-          <span>الإنجازات والخطوط المتتالية</span>
-          <span className="text-xs text-stone-400 font-mono">(Milestones & Streaks)</span>
+          <span>Milestones & Streaks</span>
+          <span className="text-xs text-stone-400 font-mono">(Goals & Progress)</span>
         </h3>
         <Sparkles className="w-4 h-4 text-stone-900" />
       </div>
@@ -75,7 +75,7 @@ export default function MilestonesView({ habits }: MilestonesViewProps) {
       <div className="space-y-4">
         {habits.length === 0 ? (
           <div className="py-8 text-center text-xs text-stone-400">
-            أضف عادات جديدة لمتابعة الإنجازات وسلاسل الأيام المتتالية.
+            Add new habits to start tracking your dynamic milestones and day streaks.
           </div>
         ) : (
           habits.map((habit) => {
@@ -108,16 +108,16 @@ export default function MilestonesView({ habits }: MilestonesViewProps) {
                     <p className="font-semibold text-xs text-stone-800 truncate">{habit.name}</p>
                   </div>
                   <p className="text-xs font-semibold text-stone-900 mt-0.5">
-                    {currentStreak} أيام متتالية (Day Streak)
+                    {currentStreak} Day Streak
                   </p>
                   <p className="text-[10px] text-stone-400 font-medium">
-                    الرقم القياسي: {allTimeRecord} يوم (Record: {allTimeRecord} Days)
+                    Record: {allTimeRecord} Days
                   </p>
                 </div>
 
                 {/* Trophy Indicator for target goals */}
                 {currentStreak >= (habit.streakGoal || 30) && (
-                  <div className="bg-stone-100 border border-stone-200 text-stone-900 p-1.5 rounded-full" title="تم تحقيق الهدف!">
+                  <div className="bg-stone-100 border border-stone-200 text-stone-900 p-1.5 rounded-full" title="Goal Achieved!">
                     <Award className="w-4 h-4 fill-stone-200" />
                   </div>
                 )}

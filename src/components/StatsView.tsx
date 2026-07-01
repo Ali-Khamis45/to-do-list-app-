@@ -143,8 +143,8 @@ export default function StatsView({
       {/* 1. Aggregated Progress Card */}
       <section className="bg-white rounded-2xl border border-stone-200/60 p-6 shadow-xs flex flex-col">
         <h3 className="font-semibold text-sm text-stone-900 mb-6 flex items-center justify-between">
-          <span>التقدم التراكمي</span>
-          <span className="text-[10px] text-stone-400 font-mono">Aggregated Progress</span>
+          <span>Aggregated Progress</span>
+          <span className="text-[10px] text-stone-400 font-mono">Real-time Completion</span>
         </h3>
         
         <div className="flex flex-col items-center gap-6">
@@ -171,7 +171,7 @@ export default function StatsView({
                   <span className="text-xs font-bold text-stone-900 font-mono">{todayPercentage}%</span>
                 </div>
               </div>
-              <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider font-mono">اليوم</span>
+              <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider font-mono">Today</span>
             </div>
 
             {/* Weekly Ring */}
@@ -194,7 +194,7 @@ export default function StatsView({
                   <span className="text-xs font-bold text-stone-700 font-mono">{weeklyPercentage}%</span>
                 </div>
               </div>
-              <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider font-mono">أسبوعي</span>
+              <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider font-mono">Weekly</span>
             </div>
 
             {/* Monthly Ring */}
@@ -217,7 +217,7 @@ export default function StatsView({
                   <span className="text-xs font-bold text-stone-600 font-mono">{monthlyPercentage}%</span>
                 </div>
               </div>
-              <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider font-mono">شهري</span>
+              <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider font-mono">Monthly</span>
             </div>
 
           </div>
@@ -226,7 +226,7 @@ export default function StatsView({
           <div className="w-full space-y-2 mt-2">
             <div className="bg-stone-50 p-4 rounded-xl border border-stone-100">
               <div className="flex justify-between items-center mb-1.5 text-xs">
-                <span className="font-semibold text-stone-600">أداء الهدف الشهري</span>
+                <span className="font-semibold text-stone-600">Monthly Goal Performance</span>
                 <span className="font-bold text-stone-900 font-mono">{performanceDaysCount} / {totalDaysInMonth} Days</span>
               </div>
               <div className="w-full h-2 bg-stone-100 rounded-full overflow-hidden">
@@ -246,12 +246,12 @@ export default function StatsView({
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-semibold text-sm text-stone-900 flex items-center gap-1.5">
             <Zap className="w-4 h-4 text-stone-900 fill-stone-900" />
-            <span>شدة التركيز وجلسات العمل</span>
+            <span>Focus Intensity & Sessions</span>
           </h3>
           <span className="text-[10px] text-stone-400 font-mono">Focus Intensity</span>
         </div>
         <p className="text-[11px] text-stone-400 mb-4">
-          انقر فوق أي مربع لتسجيل جلسة تركيز (30 دقيقة) وزيادة شدتها اليومية.
+          Click any box to log a focus session (30 minutes) and increment daily intensity.
         </p>
 
         {/* Heatmap Grid */}
@@ -287,12 +287,12 @@ export default function StatsView({
                 <span className="text-[10px] text-stone-400 font-mono">({cell.sessionCount} sessions)</span>
               </div>
               <div className="flex justify-between items-center">
-                <span>الشدة الإجمالية: {Math.round(cell.intensity * 100)}%</span>
+                <span>Total Intensity: {Math.round(cell.intensity * 100)}%</span>
                 <button
                   onClick={() => triggerLogFocus(cell.dateString)}
                   className="px-2.5 py-1 bg-stone-900 hover:bg-stone-800 text-white rounded-lg font-medium text-[10px] flex items-center gap-1 transition-colors"
                 >
-                  <PlusCircle className="w-3 h-3" /> تسجيل جلسة 
+                  <PlusCircle className="w-3 h-3" /> Log Session
                 </button>
               </div>
             </div>
@@ -301,7 +301,7 @@ export default function StatsView({
 
         {/* Legend */}
         <div className="flex items-center justify-between text-[10px] text-stone-400 pt-2 border-t border-stone-100 mt-3 font-mono">
-          <span>أقل (Less)</span>
+          <span>Less</span>
           <div className="flex gap-1">
             <div className="w-2.5 h-2.5 rounded bg-stone-200" />
             <div className="w-2.5 h-2.5 rounded bg-stone-900" style={{ opacity: 0.25 }} />
@@ -309,20 +309,20 @@ export default function StatsView({
             <div className="w-2.5 h-2.5 rounded bg-stone-900" style={{ opacity: 0.75 }} />
             <div className="w-2.5 h-2.5 rounded bg-stone-900" style={{ opacity: 1.0 }} />
           </div>
-          <span>أكثر (More)</span>
+          <span>More</span>
         </div>
       </section>
 
       {/* 3. Success Ratio Chart */}
       <section className="bg-white rounded-2xl border border-stone-200/60 p-6 shadow-xs">
         <h3 className="font-semibold text-sm text-stone-900 mb-4 flex items-center justify-between">
-          <span>نسبة نجاح العادات (%)</span>
+          <span>Habit Success Ratio (%)</span>
           <span className="text-[10px] text-stone-400 font-mono">Success Ratio</span>
         </h3>
 
         {habits.length === 0 ? (
           <div className="py-6 text-center text-xs text-stone-400">
-            أضف عادات وسجّلها لعرض نسب النجاح
+            Add and log habits to see success rates
           </div>
         ) : (
           <div className="space-y-3">
