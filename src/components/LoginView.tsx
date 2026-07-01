@@ -47,32 +47,32 @@ export default function LoginView({ authService, onLoginSuccess, onToggleRegiste
   };
 
   return (
-    <div className="w-full max-w-md bg-white rounded-2xl border border-stone-200/60 p-8 shadow-md text-left animate-in fade-in zoom-in-95 duration-200">
+    <div className="w-full max-w-md bg-bg-card text-text-primary rounded-2xl border border-border-main p-8 shadow-md text-left animate-in fade-in zoom-in-95 duration-200">
       <div className="flex flex-col items-center text-center mb-8">
         {/* App Logo Emblem */}
-        <div className="w-12 h-12 rounded-xl bg-stone-950 text-white flex items-center justify-center font-bold font-mono text-xl shadow-md mb-3">
+        <div className="w-12 h-12 rounded-xl bg-bg-btn text-text-btn flex items-center justify-center font-bold font-mono text-xl shadow-md mb-3">
           T
         </div>
-        <h2 className="font-bold text-lg text-stone-950">To Do List • Sign In</h2>
-        <p className="text-xs text-stone-400 mt-1.5 font-medium">The clean and elegant space for your tasks and daily habits</p>
+        <h2 className="font-bold text-lg text-text-primary">To Do List • Sign In</h2>
+        <p className="text-xs text-text-secondary mt-1.5 font-medium">The clean and elegant space for your tasks and daily habits</p>
       </div>
 
       {error && (
-        <div className="mb-5 p-3.5 bg-red-50 border border-red-100 rounded-xl text-xs text-red-800 font-semibold flex items-start gap-2 animate-pulse">
-          <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+        <div className="mb-5 p-3.5 bg-red-50/10 border border-red-500/20 rounded-xl text-xs text-red-500 font-semibold flex items-start gap-2 animate-pulse">
+          <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
           <span>{error}</span>
         </div>
       )}
 
       {forgotPasswordMsg && (
-        <div className="mb-5 p-3.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800 font-medium flex items-start gap-2">
+        <div className="mb-5 p-3.5 bg-bg-hover border border-border-main rounded-xl text-xs text-text-primary font-medium flex items-start gap-2">
           <span>🔔 Password recovery is future-ready (Cloud Sync Reset)!</span>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-[11px] font-bold text-stone-500 mb-1.5">Email Address</label>
+          <label className="block text-[11px] font-bold text-text-secondary mb-1.5">Email Address</label>
           <div className="relative">
             <input
               type="email"
@@ -80,19 +80,19 @@ export default function LoginView({ authService, onLoginSuccess, onToggleRegiste
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@example.com"
-              className="w-full pl-10 pr-3 py-2.5 text-xs border border-stone-200 rounded-xl text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-500 transition-all font-mono text-left"
+              className="w-full pl-10 pr-3 py-2.5 text-xs bg-bg-input border border-border-main rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-main transition-all font-mono text-left"
             />
-            <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-3" />
+            <Mail className="w-4 h-4 text-text-muted absolute left-3.5 top-3" />
           </div>
         </div>
 
         <div>
           <div className="flex justify-between items-center mb-1.5">
-            <label className="block text-[11px] font-bold text-stone-500">Password</label>
+            <label className="block text-[11px] font-bold text-text-secondary">Password</label>
             <a 
               href="#forgot" 
               onClick={handleForgotPassword}
-              className="text-[10px] text-stone-400 hover:text-stone-900 transition-colors font-medium"
+              className="text-[10px] text-text-muted hover:text-text-primary transition-colors font-medium"
             >
               Forgot Password?
             </a>
@@ -104,13 +104,13 @@ export default function LoginView({ authService, onLoginSuccess, onToggleRegiste
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full pl-10 pr-10 py-2.5 text-xs border border-stone-200 rounded-xl text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-500 transition-all text-left font-mono"
+              className="w-full pl-10 pr-10 py-2.5 text-xs bg-bg-input border border-border-main rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-main transition-all text-left font-mono"
             />
-            <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-3" />
+            <Lock className="w-4 h-4 text-text-muted absolute left-3.5 top-3" />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3.5 top-3 text-stone-400 hover:text-stone-700 transition-colors"
+              className="absolute right-3.5 top-3 text-text-muted hover:text-text-secondary transition-colors"
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -124,19 +124,19 @@ export default function LoginView({ authService, onLoginSuccess, onToggleRegiste
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 rounded border-stone-200 text-stone-900 focus:ring-stone-500"
+              className="w-4 h-4 rounded border-border-main text-text-primary focus:ring-accent-main"
             />
-            <span className="text-[11px] text-stone-500 font-medium">Remember me on this device</span>
+            <span className="text-[11px] text-text-secondary font-medium">Remember me on this device</span>
           </label>
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 bg-stone-950 hover:bg-stone-800 text-white font-bold text-xs rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          className="w-full py-2.5 bg-bg-btn hover:opacity-90 text-text-btn font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {loading ? (
-            <span className="inline-block animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
+            <span className="inline-block animate-spin rounded-full h-3.5 w-3.5 border-2 border-text-btn border-t-transparent" />
           ) : (
             <>
               <LogIn className="w-4 h-4" />
@@ -146,12 +146,12 @@ export default function LoginView({ authService, onLoginSuccess, onToggleRegiste
         </button>
       </form>
 
-      <div className="mt-6 pt-4 border-t border-stone-100 text-center">
-        <p className="text-[11px] text-stone-400">
+      <div className="mt-6 pt-4 border-t border-border-main text-center">
+        <p className="text-[11px] text-text-muted">
           Don't have an account?{' '}
           <button
             onClick={onToggleRegister}
-            className="font-bold text-stone-900 hover:underline transition-all cursor-pointer"
+            className="font-bold text-text-primary hover:underline transition-all cursor-pointer"
           >
             Create a new account
           </button>

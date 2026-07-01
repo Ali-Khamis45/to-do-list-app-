@@ -39,6 +39,12 @@ export default function StatsView({
     ? Math.round((completedTodayItems / totalTodayItems) * 100) 
     : 0;
 
+  const isTaskActiveOnDate = (task: Task, dateKey: string): boolean => {
+    if (!task.createdAt) return true;
+    const taskCreatedStr = task.createdAt.split('T')[0];
+    return dateKey >= taskCreatedStr;
+  };
+
   // 2. Calculate Weekly Progress (last 7 days)
   const getPastDateString = (daysAgo: number) => {
     const d = new Date();
@@ -57,6 +63,14 @@ export default function StatsView({
       if (status === 'completed') completedWeeklyCells++;
       if (status === 'half') completedWeeklyCells += 0.5;
     });
+    tasks.forEach(t => {
+      if (isTaskActiveOnDate(t, dateStr)) {
+        totalWeeklyCells++;
+        const status = t.logs ? (t.logs[dateStr] || null) : null;
+        if (status === 'completed') completedWeeklyCells++;
+        if (status === 'half') completedWeeklyCells += 0.5;
+      }
+    });
   }
 
   const weeklyPercentage = totalWeeklyCells > 0 
@@ -74,6 +88,14 @@ export default function StatsView({
       const status = h.logs[dateStr];
       if (status === 'completed') completedMonthlyCells++;
       if (status === 'half') completedMonthlyCells += 0.5;
+    });
+    tasks.forEach(t => {
+      if (isTaskActiveOnDate(t, dateStr)) {
+        totalMonthlyCells++;
+        const status = t.logs ? (t.logs[dateStr] || null) : null;
+        if (status === 'completed') completedMonthlyCells++;
+        if (status === 'half') completedMonthlyCells += 0.5;
+      }
     });
   }
 

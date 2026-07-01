@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User, NotificationSettings } from '../auth/UserModel';
 import { IUserRepository } from '../auth/UserRepository';
 import { User as UserIcon, Settings, Check, Bell, Shield, Calendar, Clock, Copy } from 'lucide-react';
+import { themeService, AppTheme } from '../theme/ThemeService';
 
 interface ProfileViewProps {
   user: User;
@@ -46,6 +47,7 @@ export default function ProfileView({ user, userRepository, onProfileUpdated }: 
     };
 
     userRepository.saveUser(updatedUser);
+    themeService.setTheme(theme as AppTheme, true);
     onProfileUpdated(updatedUser);
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
@@ -176,7 +178,7 @@ export default function ProfileView({ user, userRepository, onProfileUpdated }: 
               <p className="text-xs font-semibold text-stone-800">Dashboard Theme</p>
               <p className="text-[10px] text-stone-400">Select the visual theme for your layout.</p>
             </div>
-            <div className="flex gap-1.5 bg-white border border-stone-200/60 p-1 rounded-xl">
+            <div className="flex gap-1.5 bg-bg-card border border-border-main p-1 rounded-xl">
               {[
                 { name: 'stone', label: 'Classic Stone' },
                 { name: 'light', label: 'Light Mode' },
@@ -185,7 +187,10 @@ export default function ProfileView({ user, userRepository, onProfileUpdated }: 
                 <button
                   key={t.name}
                   type="button"
-                  onClick={() => setTheme(t.name)}
+                  onClick={() => {
+                    setTheme(t.name);
+                    themeService.setTheme(t.name as AppTheme, false);
+                  }}
                   className={`px-3 py-1 rounded-lg text-[10px] font-semibold transition-all cursor-pointer ${
                     theme === t.name
                       ? 'bg-stone-900 text-white shadow-xs'

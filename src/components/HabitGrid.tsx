@@ -19,9 +19,10 @@ import {
   Sparkles, 
   Apple, 
   Brain,
-  HelpCircle
+  HelpCircle,
+  FolderMinus
 } from 'lucide-react';
-import { Habit, HabitStatus } from '../types';
+import { Habit, HabitStatus, Task, TaskStatus } from '../types';
 
 // Map of string icons to Lucide components
 export const ICON_MAP: Record<string, React.ComponentType<any>> = {
@@ -41,20 +42,26 @@ export const ICON_MAP: Record<string, React.ComponentType<any>> = {
 
 interface HabitGridProps {
   habits: Habit[];
+  tasks: Task[];
   currentDate: Date; // State of active calendar viewing
   onPrevMonth: () => void;
   onNextMonth: () => void;
   onToggleCell: (habitId: string, dateString: string) => void;
+  onToggleTaskCell: (taskId: string, dateString: string) => void;
   onDeleteHabit: (habitId: string) => void;
+  onDeleteTask: (taskId: string) => void;
 }
 
 export default function HabitGrid({
   habits,
+  tasks = [],
   currentDate,
   onPrevMonth,
   onNextMonth,
   onToggleCell,
-  onDeleteHabit
+  onToggleTaskCell,
+  onDeleteHabit,
+  onDeleteTask
 }: HabitGridProps) {
   
   const year = currentDate.getFullYear();
@@ -87,15 +94,24 @@ export default function HabitGrid({
     return months[m];
   };
 
+  // Check if task is active on a given date (not prior to its creation date)
+  const isTaskActiveOnDate = (task: Task, dateKey: string): boolean => {
+    if (!task.createdAt) return true;
+    
+    // Normalize dates to YYYY-MM-DD string comparisons
+    const taskCreatedStr = task.createdAt.split('T')[0];
+    return dateKey >= taskCreatedStr;
+  };
+
   // Render cell icon depending on status
-  const renderCellIcon = (status: HabitStatus) => {
+  const renderCellIcon = (status: HabitStatus | TaskStatus) => {
     switch (status) {
       case 'completed':
         return <CheckCircle className="w-4.5 h-4.5 text-stone-900 fill-stone-100" />;
       case 'missed':
         return <XCircle className="w-4.5 h-4.5 text-red-600 fill-red-50" />;
       case 'half':
-        return <MinusCircle className="w-4.5 h-4.5 text-stone-400 fill-stone-50" />;
+        return <MinusCircle className="w-4.5 h-4.5 text-amber-500 fill-amber-50" />;
       default:
         return null;
     }
@@ -110,8 +126,8 @@ export default function HabitGrid({
             <Calendar className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="font-semibold text-lg text-stone-900">Monthly To Do List</h2>
-            <p className="text-xs text-stone-400 font-medium">Monthly Habit Grid</p>
+            <h2 className="font-semibold text-lg text-stone-900">Monthly Progress Board</h2>
+            <p className="text-xs text-stone-400 font-medium">Log and visualize your habits and tasks day-by-day</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 bg-stone-50 p-1 rounded-xl border border-stone-200/60">
@@ -133,12 +149,12 @@ export default function HabitGrid({
         </div>
       </div>
 
-      {/* Habit Grid Scroll Container */}
+      {/* Grid Scroll Container */}
       <div className="overflow-x-auto pb-2 scrollbar-thin">
         <div className="min-w-[950px] space-y-1">
           {/* Header Row (Days of month) */}
           <div className="flex items-center h-10 border-b border-stone-100 font-semibold text-xs text-stone-400 select-none">
-            <div className="w-[160px] pl-2 text-stone-500">Habit</div>
+            <div className="w-[180px] pl-2 text-stone-500 font-bold">Activities</div>
             <div className="flex-1 grid gap-px" style={{ gridTemplateColumns: 'repeat(31, minmax(0, 1fr))' }}>
               {Array.from({ length: 31 }).map((_, idx) => {
                 const dayNum = idx + 1;
@@ -163,27 +179,28 @@ export default function HabitGrid({
             </div>
           </div>
 
-          {/* Habit Rows */}
+          {/* Section: Habits */}
+          <div className="pt-3 pb-1">
+            <span className="text-[10px] font-bold tracking-wider text-stone-400 uppercase pl-2">Daily Habits</span>
+          </div>
+
           {habits.length === 0 ? (
-            <div className="py-8 text-center text-stone-400 text-sm flex flex-col items-center justify-center gap-2">
-              <Calendar className="w-8 h-8 text-stone-300 stroke-1" />
-              <span>No active habits found.</span>
-              <span className="text-xs text-stone-400 font-mono">Click the sidebar button to create your first habit.</span>
+            <div className="py-4 pl-2 text-stone-400 text-xs italic">
+              No active habits found.
             </div>
           ) : (
             habits.map((habit) => {
               const IconComponent = ICON_MAP[habit.icon] || HelpCircle;
               return (
                 <div key={habit.id} className="flex items-center h-10 hover:bg-stone-50/40 rounded-lg group transition-all">
-                  {/* Habit Title + Action Label */}
-                  <div className="w-[160px] pr-2 flex items-center justify-between text-stone-700 font-medium text-xs truncate">
-                    <div className="flex items-center gap-2 truncate">
+                  {/* Title + actions */}
+                  <div className="w-[180px] pr-2 flex items-center justify-between text-stone-700 font-medium text-xs truncate">
+                    <div className="flex items-center gap-2 truncate pl-1">
                       <div className={`p-1 rounded bg-stone-50 ${habit.color}`}>
-                        <IconComponent className="w-4 h-4" />
+                        <IconComponent className="w-3.5 h-3.5" />
                       </div>
-                      <span className="truncate" title={habit.name}>{habit.name}</span>
+                      <span className="truncate font-semibold text-stone-800" title={habit.name}>{habit.name}</span>
                     </div>
-                    {/* Delete action */}
                     <button
                       onClick={() => onDeleteHabit(habit.id)}
                       className="p-1 text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ml-1 rounded-md hover:bg-red-50"
@@ -224,6 +241,74 @@ export default function HabitGrid({
               );
             })
           )}
+
+          {/* Section: Tasks */}
+          <div className="pt-5 pb-1 border-t border-stone-100 mt-4">
+            <span className="text-[10px] font-bold tracking-wider text-stone-400 uppercase pl-2">Monthly Tasks</span>
+          </div>
+
+          {tasks.length === 0 ? (
+            <div className="py-4 pl-2 text-stone-400 text-xs italic">
+              No active tasks found. Click "Add Task" to start.
+            </div>
+          ) : (
+            tasks.map((task) => {
+              const pColor = task.priority === 'high' ? 'bg-red-500' : task.priority === 'medium' ? 'bg-stone-800' : 'bg-stone-300';
+              return (
+                <div key={task.id} className="flex items-center h-10 hover:bg-stone-50/40 rounded-lg group transition-all">
+                  {/* Title + actions */}
+                  <div className="w-[180px] pr-2 flex items-center justify-between text-stone-700 font-medium text-xs truncate">
+                    <div className="flex items-center gap-2 truncate pl-1">
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${pColor}`} title={`${task.priority || 'medium'} priority`} />
+                      <span className="truncate font-semibold text-stone-800" title={task.title}>{task.title}</span>
+                    </div>
+                    <button
+                      onClick={() => onDeleteTask(task.id)}
+                      className="p-1 text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ml-1 rounded-md hover:bg-red-50"
+                      title="Delete Task"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* 31 columns for cells */}
+                  <div className="flex-1 grid gap-px" style={{ gridTemplateColumns: 'repeat(31, minmax(0, 1fr))' }}>
+                    {Array.from({ length: 31 }).map((_, idx) => {
+                      const dayNum = idx + 1;
+                      const exists = dayNum <= totalDays;
+                      const dateKey = formatDateKey(dayNum);
+                      const active = exists && isTaskActiveOnDate(task, dateKey);
+                      const status = task.logs ? (task.logs[dateKey] || null) : null;
+                      const isToday = isCurrentMonthYear && dayNum === todayDayNum;
+
+                      return (
+                        <button
+                          key={idx}
+                          disabled={!active}
+                          onClick={() => onToggleTaskCell(task.id, dateKey)}
+                          className={`h-9 flex items-center justify-center transition-all ${
+                            active 
+                              ? `hover:bg-stone-100 cursor-pointer active:scale-90 relative ${isToday ? 'bg-stone-50' : ''}`
+                              : 'bg-stone-50/10 opacity-30 cursor-not-allowed pattern-diagonal-stripes'
+                          }`}
+                          title={!active && exists ? `Task unavailable prior to creation on ${task.createdAt || 'creation date'}` : undefined}
+                        >
+                          {exists ? (
+                            active ? (
+                              renderCellIcon(status) || <div className="w-1.5 h-1.5 rounded-full bg-stone-200 group-hover:bg-stone-300" />
+                            ) : (
+                              <FolderMinus className="w-3 h-3 text-stone-300" />
+                            )
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          )}
+
         </div>
       </div>
 
@@ -238,11 +323,11 @@ export default function HabitGrid({
           <span>Missed</span>
         </div>
         <div className="flex items-center gap-2">
-          <MinusCircle className="w-4 h-4 text-stone-400 fill-stone-50" />
+          <MinusCircle className="w-4 h-4 text-amber-500 fill-amber-50" />
           <span>Half Completed</span>
         </div>
         <div className="text-stone-300 select-none">|</div>
-        <div className="text-stone-400 italic">💡 Click on grid cells to cycle through completion states.</div>
+        <div className="text-stone-400 italic">💡 Click on grid cells to cycle through completion states. Diagonal cells denote days before task creation.</div>
       </div>
     </div>
   );

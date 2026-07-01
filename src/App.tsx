@@ -31,7 +31,7 @@ import {
   User as UserIcon,
   LogOut
 } from 'lucide-react';
-import { Habit, Task, FocusSession, UserProfile, HabitStatus } from './types';
+import { Habit, Task, FocusSession, UserProfile, HabitStatus, TaskStatus } from './types';
 import HabitGrid from './components/HabitGrid';
 import TaskList from './components/TaskList';
 import StatsView from './components/StatsView';
@@ -49,6 +49,8 @@ import { User } from './auth/UserModel';
 import LoginView from './components/LoginView';
 import RegisterView from './components/RegisterView';
 import ProfileView from './components/ProfileView';
+import { themeService } from './theme/ThemeService';
+import { useTheme } from './theme/useTheme';
 
 // Global Singleton instances for Dependency Injection
 const passwordHasher = new PasswordHasher();
@@ -75,6 +77,7 @@ const PRODUCTIVITY_TIPS = [
 ];
 
 export default function App() {
+  const theme = useTheme();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isRegistering, setIsRegistering] = useState<boolean>(false);
 
@@ -94,6 +97,15 @@ export default function App() {
     avatar: DEFAULT_AVATAR
   });
   const [density, setDensity] = useState<'standard' | 'compact'>('standard');
+  const [rolloverMode, setRolloverMode] = useState<'carryOver' | 'startEmpty'>(() => {
+    const saved = localStorage.getItem('nexus_rollover_mode');
+    return (saved === 'startEmpty' ? 'startEmpty' : 'carryOver');
+  });
+
+  const handleToggleRolloverMode = (mode: 'carryOver' | 'startEmpty') => {
+    setRolloverMode(mode);
+    localStorage.setItem('nexus_rollover_mode', mode);
+  };
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [showFeedback, setShowFeedback] = useState<boolean>(false);
   const [feedbackSent, setFeedbackSent] = useState<boolean>(false);
@@ -111,6 +123,7 @@ export default function App() {
     const rawHabits = userRepository.getHabitsByUserId(userId);
     const rawProgress = userRepository.getDailyProgressByUserId(userId);
     const rawTasks = userRepository.getTasksByUserId(userId);
+    const rawDailyTaskProgress = userRepository.getDailyTaskProgressByUserId(userId);
     const rawSessions = userRepository.getFocusSessionsByUserId(userId);
     const userObj = userRepository.getUserById(userId);
 
@@ -135,14 +148,35 @@ export default function App() {
     });
 
     // Map tasks
-    const mappedTasks: Task[] = rawTasks.map(t => ({
-      id: t.id,
-      title: t.title,
-      time: t.time,
-      subtext: t.subtext,
-      completed: t.completed,
-      date: t.date
-    }));
+    const mappedTasks: Task[] = rawTasks.map(t => {
+      const logs: Record<string, TaskStatus> = {};
+      rawDailyTaskProgress
+        .filter(p => p.taskId === t.id)
+        .forEach(p => {
+          logs[p.date] = p.status;
+        });
+      
+      const todayStr = new Date().toISOString().split('T')[0];
+      const completedToday = logs[todayStr] === 'completed';
+
+      return {
+        id: t.id,
+        title: t.title,
+        time: t.time,
+        subtext: t.subtext,
+        completed: completedToday,
+        date: t.date,
+        description: t.description,
+        category: t.category,
+        priority: t.priority,
+        reminderDate: t.reminderDate,
+        reminderTime: t.reminderTime,
+        repeatType: t.repeatType,
+        notes: t.notes,
+        createdAt: t.createdAt || t.date || todayStr,
+        logs
+      };
+    });
 
     // Map focus sessions
     const mappedSessions: FocusSession[] = rawSessions.map(s => ({
@@ -169,6 +203,7 @@ export default function App() {
   // Check existing session on startup
   useEffect(() => {
     const activeUser = authService.getLoggedInUser();
+    themeService.initialize(userRepository, activeUser);
     if (activeUser) {
       setCurrentUser(activeUser);
       loadUserData(activeUser.id);
@@ -176,6 +211,26 @@ export default function App() {
     const savedDensity = localStorage.getItem('nexus_density');
     if (savedDensity) setDensity(savedDensity as 'standard' | 'compact');
   }, []);
+
+  // Check new month rollover
+  useEffect(() => {
+    if (!currentUser || tasks.length === 0) return;
+
+    const today = new Date();
+    const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const lastCheckedMonth = localStorage.getItem(`nexus_last_checked_month_${currentUser.id}`);
+
+    if (lastCheckedMonth && lastCheckedMonth !== currentMonthKey) {
+      if (rolloverMode === 'startEmpty') {
+        tasks.forEach(t => {
+          userRepository.deleteTask(currentUser.id, t.id);
+        });
+        setTasks([]);
+      }
+    }
+
+    localStorage.setItem(`nexus_last_checked_month_${currentUser.id}`, currentMonthKey);
+  }, [currentUser, rolloverMode, tasks]);
 
   // Update live clock
   useEffect(() => {
@@ -273,37 +328,134 @@ export default function App() {
   // 4. Toggle task completion
   const handleToggleTask = (taskId: string) => {
     if (!currentUser) return;
+    const todayStr = new Date().toISOString().split('T')[0];
     const updated = tasks.map(t => {
       if (t.id === taskId) {
-        const updatedTask = { ...t, completed: !t.completed };
-        
-        // Save to database
+        const current = t.logs[todayStr] || null;
+        const next = current === 'completed' ? null : 'completed';
+
+        const updatedLogs = { ...t.logs, [todayStr]: next };
+
+        // Save progress to database
+        userRepository.saveDailyTaskProgress(currentUser.id, {
+          id: `tp-${taskId}-${todayStr}-${currentUser.id}`,
+          userId: currentUser.id,
+          taskId,
+          date: todayStr,
+          status: next
+        });
+
+        // Save task root completed status
         userRepository.saveTask(currentUser.id, {
           id: t.id,
           userId: currentUser.id,
           title: t.title,
           time: t.time,
           subtext: t.subtext,
-          completed: updatedTask.completed,
+          completed: next === 'completed',
           date: t.date,
-          createdAt: new Date().toISOString()
+          description: t.description,
+          category: t.category,
+          priority: t.priority,
+          reminderDate: t.reminderDate,
+          reminderTime: t.reminderTime,
+          repeatType: t.repeatType,
+          notes: t.notes,
+          createdAt: t.createdAt || todayStr
         });
 
-        return updatedTask;
+        return { ...t, logs: updatedLogs, completed: next === 'completed' };
       }
       return t;
     });
     setTasks(updated);
   };
 
+  // 4b. Toggle task completion for a specific cell (Date) in the Month grid
+  const handleToggleTaskCell = (taskId: string, dateString: string) => {
+    if (!currentUser) return;
+    const updated = tasks.map(t => {
+      if (t.id === taskId) {
+        const current = t.logs[dateString] || null;
+        let next: TaskStatus = null;
+        
+        if (current === null) next = 'completed';
+        else if (current === 'completed') next = 'missed';
+        else if (current === 'missed') next = 'half';
+        else next = null;
+
+        const updatedLogs = { ...t.logs, [dateString]: next };
+
+        // Save progress to database (DailyTaskProgress)
+        userRepository.saveDailyTaskProgress(currentUser.id, {
+          id: `tp-${taskId}-${dateString}-${currentUser.id}`,
+          userId: currentUser.id,
+          taskId,
+          date: dateString,
+          status: next
+        });
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const completedToday = dateString === todayStr ? (next === 'completed') : t.completed;
+
+        // Also update task root if we toggled today
+        if (dateString === todayStr) {
+          userRepository.saveTask(currentUser.id, {
+            id: t.id,
+            userId: currentUser.id,
+            title: t.title,
+            time: t.time,
+            subtext: t.subtext,
+            completed: completedToday,
+            date: t.date,
+            description: t.description,
+            category: t.category,
+            priority: t.priority,
+            reminderDate: t.reminderDate,
+            reminderTime: t.reminderTime,
+            repeatType: t.repeatType,
+            notes: t.notes,
+            createdAt: t.createdAt || todayStr
+          });
+        }
+
+        return { ...t, logs: updatedLogs, completed: completedToday };
+      }
+      return t;
+    });
+
+    setTasks(updated);
+
+    // Also automatically log a small focus session intensity if they completed a task!
+    const updatedCellState = updated.find(t => t.id === taskId)?.logs[dateString];
+    if (updatedCellState === 'completed' || updatedCellState === 'half') {
+      handleAddFocusSession(dateString, updatedCellState === 'completed' ? 0.35 : 0.2);
+    }
+  };
+
   // 5. Add custom task
-  const handleAddTask = (taskData: Omit<Task, 'id' | 'completed'>) => {
+  const handleAddTask = (taskData: {
+    title: string;
+    time: string;
+    subtext: string;
+    date: string;
+    description?: string;
+    category?: string;
+    priority?: 'low' | 'medium' | 'high';
+    reminderDate?: string;
+    reminderTime?: string;
+    repeatType?: string;
+    notes?: string;
+  }) => {
     if (!currentUser) return;
     const newId = `t-${Date.now()}`;
+    const todayStr = new Date().toISOString().split('T')[0];
     const newTask: Task = {
       ...taskData,
       id: newId,
-      completed: false
+      completed: false,
+      createdAt: todayStr,
+      logs: {}
     };
     
     // Save to database
@@ -315,7 +467,14 @@ export default function App() {
       subtext: taskData.subtext,
       completed: false,
       date: taskData.date,
-      createdAt: new Date().toISOString()
+      description: taskData.description,
+      category: taskData.category,
+      priority: taskData.priority,
+      reminderDate: taskData.reminderDate,
+      reminderTime: taskData.reminderTime,
+      repeatType: taskData.repeatType,
+      notes: taskData.notes,
+      createdAt: todayStr
     });
 
     setTasks([...tasks, newTask]);
@@ -479,6 +638,7 @@ export default function App() {
     setTasks([]);
     setFocusSessions([]);
     setActiveTab('dashboard');
+    themeService.initialize(userRepository, null);
   };
 
   // Render login/register views if not authenticated
@@ -497,6 +657,7 @@ export default function App() {
             onLoginSuccess={(user) => {
               setCurrentUser(user);
               loadUserData(user.id);
+              themeService.initialize(userRepository, user);
             }}
             onToggleRegister={() => setIsRegistering(true)}
           />
@@ -506,10 +667,10 @@ export default function App() {
   }
 
   return (
-    <div className={`flex min-h-screen ${density === 'compact' ? 'text-xs' : 'text-sm'} text-slate-800`}>
+    <div className={`flex min-h-screen ${density === 'compact' ? 'text-xs' : 'text-sm'} bg-bg-app text-text-primary transition-colors duration-200`}>
       
       {/* 1. Sidebar Panel */}
-      <aside className="fixed left-0 top-0 h-screen w-[280px] bg-stone-50/80 backdrop-blur-md flex flex-col py-6 px-4 border-r border-stone-100 z-40 select-none">
+      <aside className="fixed left-0 top-0 h-screen w-[280px] bg-bg-sidebar backdrop-blur-md flex flex-col py-6 px-4 border-r border-border-main z-40 select-none transition-colors duration-200">
         
         {/* Brand Logo Header */}
         <div className="px-4 py-2 mb-6">
@@ -542,17 +703,17 @@ export default function App() {
                 onClick={() => setActiveTab(item.id)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-left transition-all duration-150 ${
                   isActive
-                    ? 'bg-white border border-stone-200/80 text-stone-900 shadow-xs'
-                    : 'text-stone-600 hover:bg-stone-100/70 hover:text-stone-900'
+                    ? 'bg-bg-card border border-border-main text-text-primary shadow-xs'
+                    : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
                 }`}
               >
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-stone-900' : 'text-stone-400'}`} />
+                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-text-primary' : 'text-text-muted'}`} />
                 <span className="flex-1">{item.label}</span>
               </button>
             );
           })}
           
-          <div className="my-4 border-t border-stone-100" />
+          <div className="my-4 border-t border-border-main" />
           
           {[
             { id: 'settings', label: 'Settings', icon: SettingsIcon },
@@ -566,11 +727,11 @@ export default function App() {
                 onClick={() => setActiveTab(item.id)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-left transition-all duration-150 ${
                   isActive
-                    ? 'bg-white border border-stone-200/80 text-stone-900 shadow-xs'
-                    : 'text-stone-600 hover:bg-stone-100/70 hover:text-stone-900'
+                    ? 'bg-bg-card border border-border-main text-text-primary shadow-xs'
+                    : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
                 }`}
               >
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-stone-900' : 'text-stone-400'}`} />
+                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-text-primary' : 'text-text-muted'}`} />
                 <span className="flex-1">{item.label}</span>
               </button>
             );
@@ -589,7 +750,7 @@ export default function App() {
         <div className="mt-auto pt-4 space-y-3">
           <button
             onClick={() => setIsModalOpen(true)}
-            className="w-full bg-stone-900 hover:bg-stone-800 text-white font-semibold text-xs py-2.5 px-4 rounded-xl shadow-xs active:scale-97 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full bg-bg-btn hover:opacity-90 text-text-btn font-semibold text-xs py-2.5 px-4 rounded-xl shadow-xs active:scale-97 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             Add Habit / Task
@@ -616,13 +777,13 @@ export default function App() {
       </aside>
 
       {/* 2. Main Content Canvas */}
-      <main className="ml-[280px] flex-1 min-h-screen flex flex-col relative z-10 bg-[#fbfbfb]">
+      <main className="ml-[280px] flex-1 min-h-screen flex flex-col relative z-10 bg-bg-app transition-colors duration-200">
         
         {/* TopAppBar bar */}
-        <header className="fixed top-0 right-0 left-[280px] h-16 bg-white/70 backdrop-blur-md border-b border-stone-200/50 flex justify-between items-center px-8 z-30 shadow-xs">
+        <header className="fixed top-0 right-0 left-[280px] h-16 bg-bg-card/75 backdrop-blur-md border-b border-border-main flex justify-between items-center px-8 z-30 shadow-xs transition-colors duration-200">
           <div className="flex flex-col text-left">
-            <h1 className="font-bold text-sm text-stone-900">Good morning, {profile.name}</h1>
-            <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider font-mono" id="live-datetime">
+            <h1 className="font-bold text-sm text-text-primary">Good morning, {profile.name}</h1>
+            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider font-mono" id="live-datetime">
               {liveTimeStr || 'Monday, July 1, 2026 • 02:00 AM'}
             </p>
           </div>
@@ -633,35 +794,35 @@ export default function App() {
             <div className="relative">
               <button 
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="p-2 rounded-full hover:bg-stone-100 transition-colors relative cursor-pointer"
+                className="p-2 rounded-full hover:bg-bg-hover transition-colors relative cursor-pointer"
               >
-                <Bell className="w-4 h-4 text-stone-500" />
+                <Bell className="w-4 h-4 text-text-secondary" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-stone-900 rounded-full" />
+                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-accent-main rounded-full" />
                 )}
               </button>
 
               {showNotifications && (
-                <div className="absolute left-0 mt-3 w-80 bg-white rounded-xl shadow-xl border border-stone-200/60 py-2 z-50 animate-in fade-in slide-in-from-top-3 duration-200">
-                  <div className="px-4 py-2 border-b border-stone-100 flex justify-between items-center text-xs">
-                    <span className="font-bold text-stone-800">Notifications</span>
+                <div className="absolute left-0 mt-3 w-80 bg-bg-card rounded-xl shadow-xl border border-border-main py-2 z-50 animate-in fade-in slide-in-from-top-3 duration-200">
+                  <div className="px-4 py-2 border-b border-border-main flex justify-between items-center text-xs">
+                    <span className="font-bold text-text-primary">Notifications</span>
                     {unreadCount > 0 && (
-                      <span className="bg-stone-100 text-stone-900 font-bold text-[9px] px-2 py-0.5 rounded-full font-mono">
+                      <span className="bg-bg-hover text-text-primary font-bold text-[9px] px-2 py-0.5 rounded-full font-mono">
                         {unreadCount} unread
                       </span>
                     )}
                   </div>
-                  <div className="max-h-64 overflow-y-auto divide-y divide-stone-50">
+                  <div className="max-h-64 overflow-y-auto divide-y divide-border-main">
                     {notifications.map(n => (
                       <div 
                         key={n.id} 
                         onClick={() => handleMarkNotificationRead(n.id)}
-                        className={`p-3 text-xs text-stone-600 cursor-pointer hover:bg-stone-50 transition-colors flex gap-2.5 items-start ${!n.read ? 'bg-stone-50/50' : ''}`}
+                        className={`p-3 text-xs text-text-secondary cursor-pointer hover:bg-bg-hover transition-colors flex gap-2.5 items-start ${!n.read ? 'bg-bg-hover/50' : ''}`}
                       >
-                        <div className={`w-1.5 h-1.5 rounded-full mt-1.5 ${!n.read ? 'bg-stone-900' : 'bg-transparent'}`} />
+                        <div className={`w-1.5 h-1.5 rounded-full mt-1.5 ${!n.read ? 'bg-accent-main' : 'bg-transparent'}`} />
                         <div className="flex-1">
-                          <p className="font-bold text-stone-900">{n.title}</p>
-                          <p className="text-[11px] text-stone-500 mt-0.5">{n.desc}</p>
+                          <p className="font-bold text-text-primary">{n.title}</p>
+                          <p className="text-[11px] text-text-secondary mt-0.5">{n.desc}</p>
                           <p className="text-[9px] text-stone-400 mt-1">{n.time}</p>
                         </div>
                       </div>
@@ -706,11 +867,14 @@ export default function App() {
                 {/* Monthly Habit Grid */}
                 <HabitGrid 
                   habits={habits}
+                  tasks={tasks}
                   currentDate={currentCalendarDate}
                   onPrevMonth={handlePrevMonth}
                   onNextMonth={handleNextMonth}
                   onToggleCell={handleToggleCell}
+                  onToggleTaskCell={handleToggleTaskCell}
                   onDeleteHabit={handleDeleteHabit}
+                  onDeleteTask={handleDeleteTask}
                 />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -985,6 +1149,8 @@ export default function App() {
               onResetData={handleResetData}
               density={density}
               onToggleDensity={handleToggleDensity}
+              rolloverMode={rolloverMode}
+              onToggleRolloverMode={handleToggleRolloverMode}
             />
           )}
 

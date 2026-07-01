@@ -1,6 +1,7 @@
 import { 
   User, 
   RelationalTask, 
+  RelationalDailyTaskProgress,
   RelationalHabit, 
   RelationalDailyProgress, 
   RelationalAchievement, 
@@ -20,6 +21,11 @@ export interface IUserRepository {
   getTasksByUserId(userId: string): RelationalTask[];
   saveTask(userId: string, task: RelationalTask): void;
   deleteTask(userId: string, taskId: string): void;
+  
+  // Daily Task Progress Table (Task Logs)
+  getDailyTaskProgressByUserId(userId: string): RelationalDailyTaskProgress[];
+  saveDailyTaskProgress(userId: string, progress: RelationalDailyTaskProgress): void;
+  clearDailyTaskProgress(userId: string, taskId: string): void;
 
   // Habits Table
   getHabitsByUserId(userId: string): RelationalHabit[];
@@ -125,6 +131,38 @@ export class UserRepository implements IUserRepository {
     
     tasks = tasks.filter(t => t.id !== taskId);
     this.saveTable('tasks', tasks);
+    
+    // Clean up daily task progress logs
+    this.clearDailyTaskProgress(userId, taskId);
+  }
+
+  // --- Daily Task Progress Table ---
+  public getDailyTaskProgressByUserId(userId: string): RelationalDailyTaskProgress[] {
+    const progressList = this.getTable<RelationalDailyTaskProgress>('daily_task_progress');
+    return progressList.filter(p => p.userId === userId);
+  }
+
+  public saveDailyTaskProgress(userId: string, progress: RelationalDailyTaskProgress): void {
+    const progressList = this.getTable<RelationalDailyTaskProgress>('daily_task_progress');
+    // Unique match by taskId, date, and userId
+    const index = progressList.findIndex(
+      p => p.taskId === progress.taskId && p.date === progress.date && p.userId === userId
+    );
+
+    const cleanProgress = { ...progress, userId };
+
+    if (index >= 0) {
+      progressList[index] = cleanProgress;
+    } else {
+      progressList.push(cleanProgress);
+    }
+    this.saveTable('daily_task_progress', progressList);
+  }
+
+  public clearDailyTaskProgress(userId: string, taskId: string): void {
+    let progressList = this.getTable<RelationalDailyTaskProgress>('daily_task_progress');
+    progressList = progressList.filter(p => !(p.userId === userId && p.taskId === taskId));
+    this.saveTable('daily_task_progress', progressList);
   }
 
   // --- Habits Table ---

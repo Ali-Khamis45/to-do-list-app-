@@ -6,7 +6,19 @@ interface TaskListProps {
   tasks: Task[];
   activeDateString: string;
   onToggleTask: (taskId: string) => void;
-  onAddTask: (task: Omit<Task, 'id' | 'completed'>) => void;
+  onAddTask: (task: {
+    title: string;
+    time: string;
+    subtext: string;
+    date: string;
+    description?: string;
+    category?: string;
+    priority?: 'low' | 'medium' | 'high';
+    reminderDate?: string;
+    reminderTime?: string;
+    repeatType?: string;
+    notes?: string;
+  }) => void;
   onDeleteTask: (taskId: string) => void;
 }
 
@@ -142,18 +154,47 @@ export default function TaskList({
 
               {/* Task Details */}
               <div className="flex-1 min-w-0">
-                <p className={`text-xs font-semibold truncate flex items-center gap-1.5 ${
-                  task.completed ? 'line-through text-stone-400' : 'text-stone-700'
-                }`}>
-                  <Clock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                  <span className="font-mono text-[10px] font-medium text-stone-400 shrink-0">{task.time}</span>
-                  <span className="truncate">{task.title}</span>
-                </p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className={`text-xs font-semibold truncate flex items-center gap-1.5 ${
+                    task.completed ? 'line-through text-stone-400' : 'text-stone-700'
+                  }`}>
+                    <Clock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                    <span className="font-mono text-[10px] font-medium text-stone-400 shrink-0">{task.time}</span>
+                    <span className="truncate">{task.title}</span>
+                  </p>
+                  
+                  {task.priority && (
+                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
+                      task.priority === 'high' 
+                        ? 'bg-red-50 text-red-600 border border-red-100' 
+                        : task.priority === 'medium'
+                        ? 'bg-stone-100 text-stone-700'
+                        : 'bg-stone-50 text-stone-400'
+                    }`}>
+                      {task.priority}
+                    </span>
+                  )}
+
+                  {task.category && (
+                    <span className="text-[8px] bg-stone-50 text-stone-500 px-1.5 py-0.5 rounded-md border border-stone-100 font-medium">
+                      {task.category}
+                    </span>
+                  )}
+                </div>
+
                 {task.subtext && (
-                  <p className={`text-[10px] pl-5 truncate ${
+                  <p className={`text-[10px] pl-5 mt-0.5 truncate ${
                     task.completed ? 'text-stone-300' : 'text-stone-400'
                   }`}>
                     {task.subtext}
+                  </p>
+                )}
+
+                {task.description && (
+                  <p className={`text-[9px] pl-5 mt-0.5 text-stone-400/80 italic line-clamp-1 ${
+                    task.completed ? 'text-stone-300/60' : ''
+                  }`}>
+                    {task.description}
                   </p>
                 )}
               </div>

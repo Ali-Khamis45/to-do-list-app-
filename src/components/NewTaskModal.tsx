@@ -1,11 +1,23 @@
 import React, { useState } from 'react';
-import { X, Check, BookOpen, Dumbbell, Code, Coffee, Flame, Heart, Smile, CheckSquare, Music, Sparkles, Apple, Brain, Compass } from 'lucide-react';
+import { X, Check, BookOpen, Dumbbell, Code, Coffee, Flame, Heart, Smile, CheckSquare, Music, Sparkles, Apple, Brain, Compass, AlertCircle, Bell } from 'lucide-react';
 import { Habit, Task } from '../types';
 
 interface NewTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddTask: (task: Omit<Task, 'id' | 'completed'>) => void;
+  onAddTask: (task: {
+    title: string;
+    time: string;
+    subtext: string;
+    date: string;
+    description?: string;
+    category?: string;
+    priority?: 'low' | 'medium' | 'high';
+    reminderDate?: string;
+    reminderTime?: string;
+    repeatType?: string;
+    notes?: string;
+  }) => void;
   onAddHabit: (habit: Omit<Habit, 'id' | 'logs' | 'createdAt'>) => void;
 }
 
@@ -44,26 +56,90 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('Personal');
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [reminderDate, setReminderDate] = useState('');
+  const [reminderTime, setReminderTime] = useState('');
+  const [repeatType, setRepeatType] = useState('none');
+  const [notes, setNotes] = useState('');
 
   // Habit state
   const [habitName, setHabitName] = useState('');
-  const [selectedIcon, setSelectedIcon] = useState('BookOpen');
+  const [selectedIcon, setSelectedIcon] = useState('CheckSquare');
   const [selectedColor, setSelectedColor] = useState(COLOR_PRESETS[0]);
-  const [streakGoal, setStreakGoal] = useState(30);
+  const [streakGoal, setStreakGoal] = useState('30');
+
+  // Validation function
+  const validateForm = () => {
+    const errors: string[] = [];
+    if (!taskTitle.trim()) {
+      errors.push("Task title is required.");
+    }
+    
+    // Check if one reminder field is specified but not both
+    if (reminderDate && !reminderTime) {
+      errors.push("Please specify a Reminder Time to schedule the reminder.");
+    }
+    if (reminderTime && !reminderDate) {
+      errors.push("Please specify a Reminder Date to schedule the reminder.");
+    }
+
+    if (reminderDate) {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(reminderDate)) {
+        errors.push("Invalid Reminder Date format.");
+      } else {
+        const selected = new Date(reminderDate + 'T00:00:00');
+        const todayStr = new Date().toISOString().split('T')[0];
+        const today = new Date(todayStr + 'T00:00:00');
+        if (selected < today) {
+          errors.push("Reminder Date cannot be in the past.");
+        }
+      }
+    }
+
+    if (reminderTime) {
+      const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+      if (!timeRegex.test(reminderTime)) {
+        errors.push("Invalid Reminder Time format (use HH:MM).");
+      }
+    }
+
+    return errors;
+  };
+
+  const validationErrors = validateForm();
+  const isValid = validationErrors.length === 0;
 
   if (!isOpen) return null;
 
   const handleTaskSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!taskTitle.trim()) return;
+    if (!isValid) return;
     onAddTask({
       title: taskTitle,
       time: taskTime,
       subtext: taskSubtext,
       date: taskDate,
+      description,
+      category,
+      priority,
+      reminderDate: reminderDate || undefined,
+      reminderTime: reminderTime || undefined,
+      repeatType,
+      notes,
     });
     setTaskTitle('');
+    setTaskTime('09:00');
     setTaskSubtext('');
+    setDescription('');
+    setCategory('Personal');
+    setPriority('medium');
+    setReminderDate('');
+    setReminderTime('');
+    setRepeatType('none');
+    setNotes('');
     onClose();
   };
 
@@ -117,10 +193,22 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
         </div>
 
         {/* Form Body */}
+        {/* Form Body */}
         {activeTab === 'task' ? (
-          <form onSubmit={handleTaskSubmit} className="p-5 space-y-4">
+          <form onSubmit={handleTaskSubmit} className="p-5 space-y-3 max-h-[75vh] overflow-y-auto">
+            {validationErrors.length > 0 && (
+              <div className="p-3 bg-red-50/20 border border-red-500/20 rounded-xl text-[10px] text-red-500 font-semibold space-y-1">
+                {validationErrors.map((err, i) => (
+                  <div key={i} className="flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                    <span>{err}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div>
-              <label className="block text-[10px] font-semibold text-stone-400 mb-1">Task Name</label>
+              <label className="block text-[10px] font-bold text-stone-400 mb-1">Task Name *</label>
               <input
                 type="text"
                 required
@@ -131,9 +219,20 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-bold text-stone-400 mb-1">Description</label>
+              <input
+                type="text"
+                placeholder="Brief description..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent transition-all"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] font-semibold text-stone-400 mb-1">Time</label>
+                <label className="block text-[10px] font-bold text-stone-400 mb-1">Time</label>
                 <input
                   type="time"
                   required
@@ -143,7 +242,7 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-stone-400 mb-1">Date</label>
+                <label className="block text-[10px] font-bold text-stone-400 mb-1">Start Date</label>
                 <input
                   type="date"
                   required
@@ -154,22 +253,104 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask, onAddHabit }:
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-stone-400 mb-1">Category</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent transition-all bg-white"
+                >
+                  <option value="Personal">Personal</option>
+                  <option value="Work">Work</option>
+                  <option value="Fitness">Fitness</option>
+                  <option value="Learning">Learning</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-stone-400 mb-1">Repeat Type</label>
+                <select
+                  value={repeatType}
+                  onChange={(e) => setRepeatType(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent transition-all bg-white"
+                >
+                  <option value="none">Does Not Repeat</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+            </div>
+
             <div>
-              <label className="block text-[10px] font-semibold text-stone-400 mb-1">Additional Details (Optional)</label>
-              <input
-                type="text"
-                placeholder="Enter details (e.g. Focus on deep work)"
-                value={taskSubtext}
-                onChange={(e) => setTaskSubtext(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent transition-all"
+              <label className="block text-[10px] font-bold text-stone-400 mb-1">Priority</label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['low', 'medium', 'high'] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPriority(p)}
+                    className={`py-1.5 px-3 rounded-lg text-[10px] font-semibold border capitalize transition-all ${
+                      priority === p
+                        ? p === 'high'
+                          ? 'bg-red-50 text-red-600 border-red-300 ring-1 ring-red-300'
+                          : p === 'medium'
+                          ? 'bg-stone-900 text-white border-stone-900'
+                          : 'bg-stone-50 text-stone-600 border-stone-300'
+                        : 'bg-white text-stone-400 border-stone-200 hover:text-stone-700'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Reminder Fields */}
+            <div className="p-3 bg-stone-50 rounded-xl border border-stone-100 space-y-2">
+              <span className="text-[10px] font-bold text-stone-500 flex items-center gap-1">
+                <Bell className="w-3.5 h-3.5 text-stone-400" /> Reminder (Optional Toast)
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[9px] font-bold text-stone-400 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={reminderDate}
+                    onChange={(e) => setReminderDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs border border-stone-200 rounded-lg text-stone-800 focus:outline-none focus:ring-1 focus:ring-stone-500 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-bold text-stone-400 mb-1">Time</label>
+                  <input
+                    type="time"
+                    value={reminderTime}
+                    onChange={(e) => setReminderTime(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs border border-stone-200 rounded-lg text-stone-800 focus:outline-none focus:ring-1 focus:ring-stone-500 bg-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-stone-400 mb-1">Notes</label>
+              <textarea
+                placeholder="Enter notes..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent transition-all resize-none"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full mt-4 bg-stone-900 hover:bg-stone-800 text-white font-semibold py-2 px-4 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2"
+              disabled={!isValid}
+              className="w-full mt-3 bg-stone-900 hover:bg-stone-800 text-white font-semibold py-2 px-4 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              <Check className="w-4 h-4" /> Add Task
+              <Check className="w-4 h-4" /> Save Task
             </button>
           </form>
         ) : (

@@ -8,6 +8,8 @@ interface SettingsViewProps {
   onResetData: () => void;
   density: 'standard' | 'compact';
   onToggleDensity: (mode: 'standard' | 'compact') => void;
+  rolloverMode: 'carryOver' | 'startEmpty';
+  onToggleRolloverMode: (mode: 'carryOver' | 'startEmpty') => void;
 }
 
 export default function SettingsView({
@@ -15,7 +17,9 @@ export default function SettingsView({
   onUpdateProfile,
   onResetData,
   density,
-  onToggleDensity
+  onToggleDensity,
+  rolloverMode,
+  onToggleRolloverMode
 }: SettingsViewProps) {
   const [name, setName] = useState(profile.name);
   const [avatar, setAvatar] = useState(profile.avatar);
@@ -119,8 +123,10 @@ export default function SettingsView({
       <div className="border-t border-stone-100 pt-6 space-y-3">
         <h3 className="font-semibold text-xs text-stone-700 flex items-center gap-2">
           <Sliders className="w-3.5 h-3.5 text-stone-400" />
-          <span>Display Preferences</span>
+          <span>Display & Tracker Preferences</span>
         </h3>
+        
+        {/* Layout Density Row */}
         <div className="flex justify-between items-center bg-stone-50 p-4 rounded-xl border border-stone-100">
           <div>
             <p className="text-xs font-semibold text-stone-800">Layout Density</p>
@@ -146,6 +152,38 @@ export default function SettingsView({
               }`}
             >
               Compact
+            </button>
+          </div>
+        </div>
+
+        {/* Task Rollover Row */}
+        <div className="flex justify-between items-center bg-stone-50 p-4 rounded-xl border border-stone-100">
+          <div>
+            <p className="text-xs font-semibold text-stone-800">New Month Task Behavior</p>
+            <p className="text-[10px] text-stone-400">Choose behavior for active tasks when a new month begins.</p>
+          </div>
+          <div className="flex gap-1.5 bg-white border border-stone-200/60 p-1 rounded-xl">
+            <button
+              onClick={() => onToggleRolloverMode('carryOver')}
+              className={`px-3 py-1 rounded-lg text-[10px] font-semibold transition-all ${
+                rolloverMode === 'carryOver' 
+                  ? 'bg-stone-900 text-white shadow-xs' 
+                  : 'text-stone-400 hover:text-stone-900'
+              }`}
+              title="Option A: Carry over active tasks into the new month grid automatically"
+            >
+              Option A: Carry Over
+            </button>
+            <button
+              onClick={() => onToggleRolloverMode('startEmpty')}
+              className={`px-3 py-1 rounded-lg text-[10px] font-semibold transition-all ${
+                rolloverMode === 'startEmpty' 
+                  ? 'bg-stone-900 text-white shadow-xs' 
+                  : 'text-stone-400 hover:text-stone-900'
+              }`}
+              title="Option B: Start an empty month grid without carrying over previous tasks"
+            >
+              Option B: Start Empty
             </button>
           </div>
         </div>

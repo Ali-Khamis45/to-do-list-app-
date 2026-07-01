@@ -11,13 +11,24 @@ export interface Habit {
   streakGoal?: number;
 }
 
+export type TaskStatus = 'completed' | 'missed' | 'half' | null;
+
 export interface Task {
   id: string;
   title: string;
   time: string; // HH:MM
   subtext: string;
-  completed: boolean;
-  date: string; // YYYY-MM-DD
+  completed: boolean; // Computed or today's state
+  date: string; // YYYY-MM-DD (fallback or creation date)
+  description?: string;
+  category?: string;
+  priority?: 'low' | 'medium' | 'high';
+  reminderDate?: string; // YYYY-MM-DD
+  reminderTime?: string; // HH:MM
+  repeatType?: string; // e.g. 'none' | 'daily' | 'weekly' | 'monthly'
+  notes?: string;
+  createdAt: string; // YYYY-MM-DD
+  logs: Record<string, TaskStatus>; // key: YYYY-MM-DD
 }
 
 export interface FocusSession {

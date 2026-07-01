@@ -26,7 +26,20 @@ export interface RelationalTask {
   date: string; // YYYY-MM-DD
   category?: string;
   priority?: 'low' | 'medium' | 'high';
+  description?: string;
+  reminderDate?: string;
+  reminderTime?: string;
+  repeatType?: string;
+  notes?: string;
   createdAt: string;
+}
+
+export interface RelationalDailyTaskProgress {
+  id: string;
+  taskId: string;
+  userId: string;
+  date: string; // YYYY-MM-DD
+  status: 'completed' | 'missed' | 'half' | null;
 }
 
 export interface RelationalHabit {
