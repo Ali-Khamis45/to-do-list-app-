@@ -1,0 +1,6 @@
+{
+  "name": "Nexus Desktop",
+  "description": "An elite productivity dashboard and monthly habit tracking system designed to streamline your daily goals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
