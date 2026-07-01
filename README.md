@@ -1,20 +1,7 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Monthly Productivity Tracker
 
-# Run and deploy your AI Studio app
+Monthly Productivity Tracker is a Windows desktop application designed to help you stay organized and consistent with your daily goals.
 
-This contains everything you need to run your app locally.
+Instead of managing tasks across multiple apps, it brings everything together in one place—a monthly habit tracker, a to-do list, smart reminders, progress statistics, streak tracking, and achievements.
 
-View your app in AI Studio: https://ai.studio/apps/b4345e1d-395b-44ed-b837-00c805471e22
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+The goal of this project is simple: make it easier to build good habits, keep track of important tasks, and stay productive throughout the month with a clean and intuitive interface.
