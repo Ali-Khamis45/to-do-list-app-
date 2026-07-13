@@ -1,3 +1,6 @@
+import { Goal as RelationalGoal } from '../goals/types';
+import { Idea as RelationalIdea, IdeaLink as RelationalIdeaLink } from '../brain/types';
+
 export interface NotificationSettings {
   enableReminders: boolean;
   alertSound: boolean;
@@ -32,6 +35,10 @@ export interface RelationalTask {
   repeatType?: string;
   notes?: string;
   createdAt: string;
+  goalId?: string; // Links task to a goal
+  milestoneId?: string; // Links task to a specific milestone
+  projectId?: string; // Links task to a project (Idea)
+  ideaId?: string; // Links task to a source idea
 }
 
 export interface RelationalDailyTaskProgress {
@@ -92,3 +99,6 @@ export interface RelationalStatistic {
   key: string;
   value: string;
 }
+
+export { RelationalGoal, RelationalIdea, RelationalIdeaLink };
+

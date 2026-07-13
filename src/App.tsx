@@ -29,9 +29,15 @@ import {
   ChevronRight,
   ChevronLeft,
   User as UserIcon,
-  LogOut
+  LogOut,
+  Target
 } from 'lucide-react';
 import { Habit, Task, FocusSession, UserProfile, HabitStatus, TaskStatus } from './types';
+import { Goal } from './goals/types';
+import { Idea, IdeaLink } from './brain/types';
+import { forecastGoalMetrics } from './goals/forecast';
+import SmartGoalPlanner from './components/SmartGoalPlanner';
+import AIBrain from './components/AIBrain';
 import HabitGrid from './components/HabitGrid';
 import TaskList from './components/TaskList';
 import StatsView from './components/StatsView';
@@ -90,6 +96,9 @@ export default function App() {
   // App data states
   const [habits, setHabits] = useState<Habit[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [ideaLinks, setIdeaLinks] = useState<IdeaLink[]>([]);
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
   const [profile, setProfile] = useState<UserProfile>({
     name: 'To Do List User',
@@ -174,6 +183,8 @@ export default function App() {
         repeatType: t.repeatType,
         notes: t.notes,
         createdAt: t.createdAt || t.date || todayStr,
+        projectId: t.projectId,
+        ideaId: t.ideaId,
         logs
       };
     });
@@ -186,9 +197,16 @@ export default function App() {
       durationMinutes: s.durationMinutes
     }));
 
+    const rawGoals = userRepository.getGoalsByUserId(userId);
+    const rawIdeas = userRepository.getIdeasByUserId(userId);
+    const rawLinks = userRepository.getIdeaLinksByUserId(userId);
+
     // Set states
     setHabits(mappedHabits);
     setTasks(mappedTasks);
+    setGoals(rawGoals);
+    setIdeas(rawIdeas);
+    setIdeaLinks(rawLinks);
     setFocusSessions(mappedSessions);
 
     if (userObj) {
@@ -256,6 +274,261 @@ export default function App() {
     const interval = setInterval(updateDateTime, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Dynamically generate virtual tasks from active goals & sub-goals recursively
+  const mergedTasks = useMemo(() => {
+    if (!currentUser) return tasks;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const goalTasks: Task[] = [];
+
+    const getActiveGoalTasks = (g: Goal): Task[] => {
+      const list: Task[] = [];
+      if (g.status !== 'active') return list;
+
+      // Process subgoals
+      if (g.subGoals && g.subGoals.length > 0) {
+        g.subGoals.forEach(sg => {
+          list.push(...getActiveGoalTasks(sg));
+        });
+      }
+
+      const metrics = forecastGoalMetrics(g, todayStr);
+      const targetToday = metrics.requiredPace > 0 
+        ? metrics.requiredPace 
+        : (g.targetValue / Math.max(1, metrics.daysTotal));
+
+      if (g.goalType === 'numeric' || g.goalType === 'habit') {
+        const logToday = g.logs.find(l => l.date === todayStr);
+        const completed = !!logToday && logToday.value > 0;
+        
+        // Time estimation conversion
+        const minutesEstimate = Math.round(targetToday * g.estimatedMinutesPerUnit);
+        const title = minutesEstimate > 0
+          ? `Spend ${minutesEstimate} mins on: ${g.title}`
+          : `Log progress: ${g.title} (${targetToday < 1 ? targetToday.toFixed(2) : Math.round(targetToday)} ${g.unit})`;
+
+        list.push({
+          id: `gt-${g.id}`,
+          title,
+          time: '09:00',
+          subtext: `Goal Action Item • Target: ${targetToday < 1 ? targetToday.toFixed(2) : Math.round(targetToday)} ${g.unit}`,
+          completed,
+          date: todayStr,
+          category: g.category,
+          priority: g.priority === 'critical' ? 'high' : g.priority,
+          createdAt: todayStr,
+          logs: {}
+        });
+      } else if (g.goalType === 'milestone') {
+        // Uncompleted milestones as tasks
+        const uncompleted = g.milestones.filter(m => !m.completed);
+        uncompleted.forEach(m => {
+          list.push({
+            id: `gt-milestone-${g.id}-${m.id}`,
+            title: `Milestone: ${m.title} (${g.title})`,
+            time: '12:00',
+            subtext: `Goal Milestones Checklist`,
+            completed: false,
+            date: todayStr,
+            category: g.category,
+            priority: g.priority === 'critical' ? 'high' : g.priority,
+            createdAt: todayStr,
+            logs: {}
+          });
+        });
+
+        // Completed milestones today
+        const completedToday = g.milestones.filter(m => m.completed && m.completedDate === todayStr);
+        completedToday.forEach(m => {
+          list.push({
+            id: `gt-milestone-${g.id}-${m.id}`,
+            title: `Milestone: ${m.title} (${g.title})`,
+            time: '12:00',
+            subtext: `Goal Milestones Checklist`,
+            completed: true,
+            date: todayStr,
+            category: g.category,
+            priority: g.priority === 'critical' ? 'high' : g.priority,
+            createdAt: todayStr,
+            logs: {}
+          });
+        });
+      }
+      return list;
+    };
+
+    goals.forEach(goal => {
+      goalTasks.push(...getActiveGoalTasks(goal));
+    });
+
+    return [...tasks, ...goalTasks];
+  }, [tasks, goals, currentUser]);
+
+  // Handler for ticking virtual goal tasks
+  const handleToggleGoalTask = (taskId: string, dateStr: string) => {
+    if (!currentUser) return;
+    const isMilestone = taskId.startsWith('gt-milestone-');
+
+    const updateGoalInTree = (gList: Goal[], targetId: string, updater: (g: Goal) => Goal): Goal[] => {
+      return gList.map(g => {
+        if (g.id === targetId) {
+          return updater(g);
+        }
+        if (g.subGoals && g.subGoals.length > 0) {
+          return {
+            ...g,
+            subGoals: updateGoalInTree(g.subGoals, targetId, updater)
+          };
+        }
+        return g;
+      });
+    };
+
+    const findGoal = (gList: Goal[], id: string): Goal | null => {
+      for (const g of gList) {
+        if (g.id === id) return g;
+        if (g.subGoals && g.subGoals.length > 0) {
+          const res = findGoal(g.subGoals, id);
+          if (res) return res;
+        }
+      }
+      return null;
+    };
+
+    if (isMilestone) {
+      const parts = taskId.split('-');
+      const goalId = parts[2];
+      const milestoneId = parts[3];
+
+      const targetGoal = findGoal(goals, goalId);
+      if (!targetGoal) return;
+
+      const updatedMilestones = targetGoal.milestones.map(m => {
+        if (m.id === milestoneId) {
+          const nextCompleted = !m.completed;
+          return {
+            ...m,
+            completed: nextCompleted,
+            completedDate: nextCompleted ? dateStr : undefined
+          };
+        }
+        return m;
+      });
+
+      const nextCompleted = updatedMilestones.find(m => m.id === milestoneId)?.completed;
+      const milestoneObj = targetGoal.milestones.find(m => m.id === milestoneId);
+      const eventType = nextCompleted ? 'milestone_completed' : 'milestone_uncompleted';
+      const eventDesc = nextCompleted 
+        ? `Completed milestone: ${milestoneObj?.title}`
+        : `Uncompleted milestone: ${milestoneObj?.title}`;
+
+      const newEvent = {
+        id: `evt-${Date.now()}`,
+        goalId,
+        eventType: eventType as any,
+        timestamp: new Date().toISOString(),
+        description: eventDesc
+      };
+
+      let updatedLogs = [...targetGoal.logs];
+      if (targetGoal.goalType === 'milestone') {
+        if (nextCompleted) {
+          updatedLogs.push({ date: dateStr, value: 1, note: `Completed: ${milestoneObj?.title}` });
+        } else {
+          const logIdx = updatedLogs.findIndex(l => l.date === dateStr && l.value === 1);
+          if (logIdx >= 0) updatedLogs.splice(logIdx, 1);
+        }
+      }
+
+      const nextGoals = updateGoalInTree(goals, goalId, (g) => ({
+        ...g,
+        milestones: updatedMilestones,
+        logs: updatedLogs,
+        currentValue: g.currentValue + (nextCompleted ? 1 : -1),
+        history: [...g.history, newEvent]
+      }));
+
+      const findRootGoal = (gList: Goal[], id: string): Goal | null => {
+        for (const g of gList) {
+          if (g.id === id) return g;
+          if (g.subGoals && g.subGoals.length > 0) {
+            const res = findGoal(g.subGoals, id);
+            if (res) return g;
+          }
+        }
+        return null;
+      };
+
+      const rootGoal = findRootGoal(goals, goalId);
+      if (rootGoal) {
+        const updatedRoot = nextGoals.find(g => g.id === rootGoal.id);
+        if (updatedRoot) userRepository.saveGoal(currentUser.id, updatedRoot);
+      }
+      setGoals(nextGoals);
+    } else {
+      const goalId = taskId.replace('gt-', '');
+      const targetGoal = findGoal(goals, goalId);
+      if (!targetGoal) return;
+
+      const metrics = forecastGoalMetrics(targetGoal, dateStr);
+      const targetToday = metrics.requiredPace > 0 
+        ? metrics.requiredPace 
+        : (targetGoal.targetValue / Math.max(1, metrics.daysTotal));
+
+      const logToday = targetGoal.logs.find(l => l.date === dateStr);
+      let updatedLogs = [...targetGoal.logs];
+      let valueDiff = 0;
+
+      if (logToday) {
+        updatedLogs = updatedLogs.filter(l => l.date !== dateStr);
+        valueDiff = -logToday.value;
+      } else {
+        const logVal = targetToday < 1 ? parseFloat(targetToday.toFixed(2)) : Math.round(targetToday);
+        updatedLogs.push({
+          date: dateStr,
+          value: logVal,
+          note: 'Completed via daily task list'
+        });
+        valueDiff = logVal;
+      }
+
+      const isCompleted = !logToday;
+      const newEvent = {
+        id: `evt-${Date.now()}`,
+        goalId,
+        eventType: (isCompleted ? 'log_added' : 'log_removed') as any,
+        timestamp: new Date().toISOString(),
+        description: isCompleted 
+          ? `Logged ${valueDiff} ${targetGoal.unit} progress`
+          : `Removed progress log`
+      };
+
+      const nextGoals = updateGoalInTree(goals, goalId, (g) => ({
+        ...g,
+        logs: updatedLogs,
+        currentValue: parseFloat((g.currentValue + valueDiff).toFixed(2)),
+        history: [...g.history, newEvent]
+      }));
+
+      const findRootGoal = (gList: Goal[], id: string): Goal | null => {
+        for (const g of gList) {
+          if (g.id === id) return g;
+          if (g.subGoals && g.subGoals.length > 0) {
+            const res = findGoal(g.subGoals, id);
+            if (res) return g;
+          }
+        }
+        return null;
+      };
+
+      const rootGoal = findRootGoal(goals, goalId);
+      if (rootGoal) {
+        const updatedRoot = nextGoals.find(g => g.id === rootGoal.id);
+        if (updatedRoot) userRepository.saveGoal(currentUser.id, updatedRoot);
+      }
+      setGoals(nextGoals);
+    }
+  };
 
   // 1. Grid cell interaction: toggle state cycles through: empty -> completed -> missed -> half -> empty
   const handleToggleCell = (habitId: string, dateString: string) => {
@@ -329,6 +602,12 @@ export default function App() {
   const handleToggleTask = (taskId: string) => {
     if (!currentUser) return;
     const todayStr = new Date().toISOString().split('T')[0];
+
+    if (taskId.startsWith('gt-')) {
+      handleToggleGoalTask(taskId, todayStr);
+      return;
+    }
+
     const updated = tasks.map(t => {
       if (t.id === taskId) {
         const current = t.logs[todayStr] || null;
@@ -374,6 +653,12 @@ export default function App() {
   // 4b. Toggle task completion for a specific cell (Date) in the Month grid
   const handleToggleTaskCell = (taskId: string, dateString: string) => {
     if (!currentUser) return;
+    
+    if (taskId.startsWith('gt-')) {
+      handleToggleGoalTask(taskId, dateString);
+      return;
+    }
+
     const updated = tasks.map(t => {
       if (t.id === taskId) {
         const current = t.logs[dateString] || null;
@@ -510,8 +795,62 @@ export default function App() {
   // 7. Delete task
   const handleDeleteTask = (taskId: string) => {
     if (!currentUser) return;
+    if (taskId.startsWith('gt-')) return; // Virtual goal tasks cannot be deleted
     userRepository.deleteTask(currentUser.id, taskId);
     setTasks(tasks.filter(t => t.id !== taskId));
+  };
+
+  // AI Brain Handlers
+  const handleSaveIdea = (idea: Idea) => {
+    if (!currentUser) return;
+    userRepository.saveIdea(currentUser.id, idea);
+    setIdeas(userRepository.getIdeasByUserId(currentUser.id));
+  };
+
+  const handleDeleteIdea = (ideaId: string) => {
+    if (!currentUser) return;
+    userRepository.deleteIdea(currentUser.id, ideaId);
+    setIdeas(userRepository.getIdeasByUserId(currentUser.id));
+    setIdeaLinks(userRepository.getIdeaLinksByUserId(currentUser.id));
+  };
+
+  const handleSaveIdeaLink = (link: IdeaLink) => {
+    if (!currentUser) return;
+    userRepository.saveIdeaLink(currentUser.id, link);
+    setIdeaLinks(userRepository.getIdeaLinksByUserId(currentUser.id));
+  };
+
+  const handleDeleteIdeaLink = (linkId: string) => {
+    if (!currentUser) return;
+    userRepository.deleteIdeaLink(currentUser.id, linkId);
+    setIdeaLinks(userRepository.getIdeaLinksByUserId(currentUser.id));
+  };
+
+  const handleAddDirectTask = (task: Task) => {
+    if (!currentUser) return;
+    userRepository.saveTask(currentUser.id, {
+      id: task.id,
+      userId: currentUser.id,
+      title: task.title,
+      time: task.time,
+      subtext: task.subtext,
+      completed: task.completed,
+      date: task.date,
+      description: task.description,
+      category: task.category,
+      priority: task.priority,
+      notes: task.notes,
+      createdAt: task.createdAt,
+      projectId: task.projectId,
+      ideaId: task.ideaId
+    });
+    setTasks(prev => [...prev, { ...task, logs: {} }]);
+  };
+
+  const handleAddProjectGoal = (goal: Goal) => {
+    if (!currentUser) return;
+    userRepository.saveGoal(currentUser.id, goal);
+    setGoals(userRepository.getGoalsByUserId(currentUser.id));
   };
 
   // 8. Update User profile
@@ -636,6 +975,7 @@ export default function App() {
     setCurrentUser(null);
     setHabits([]);
     setTasks([]);
+    setGoals([]);
     setFocusSessions([]);
     setActiveTab('dashboard');
     themeService.initialize(userRepository, null);
@@ -689,6 +1029,8 @@ export default function App() {
         <nav className="flex-1 space-y-1">
           {[
             { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+            { id: 'goals', label: 'Smart Goals', icon: Target },
+            { id: 'brain', label: 'AI Brain', icon: Brain },
             { id: 'tracker', label: 'To Do Grid', icon: LineChart },
             { id: 'statistics', label: 'Analytics & Stats', icon: BarChart3 },
             { id: 'achievements', label: 'Achievements', icon: Trophy },
@@ -867,7 +1209,7 @@ export default function App() {
                 {/* Monthly Habit Grid */}
                 <HabitGrid 
                   habits={habits}
-                  tasks={tasks}
+                  tasks={mergedTasks}
                   currentDate={currentCalendarDate}
                   onPrevMonth={handlePrevMonth}
                   onNextMonth={handleNextMonth}
@@ -914,14 +1256,14 @@ export default function App() {
               {/* Right Sidebar Focus Panel */}
               <StatsView 
                 habits={habits}
-                tasks={tasks}
+                tasks={mergedTasks}
                 focusSessions={focusSessions}
                 onAddFocusSession={handleAddFocusSession}
               />
 
               <div className="w-full lg:w-[320px] shrink-0">
                 <TaskList 
-                  tasks={tasks}
+                  tasks={mergedTasks}
                   activeDateString={getRelativeDateString(0)}
                   onToggleTask={handleToggleTask}
                   onAddTask={handleAddTask}
@@ -930,6 +1272,23 @@ export default function App() {
               </div>
 
             </div>
+          )}
+
+          {activeTab === 'brain' && (
+            <AIBrain 
+              userId={currentUser.id}
+              ideas={ideas}
+              ideaLinks={ideaLinks}
+              tasks={tasks}
+              goals={goals}
+              onSaveIdea={handleSaveIdea}
+              onDeleteIdea={handleDeleteIdea}
+              onSaveIdeaLink={handleSaveIdeaLink}
+              onDeleteIdeaLink={handleDeleteIdeaLink}
+              onAddTask={handleAddDirectTask}
+              onAddGoal={handleAddProjectGoal}
+              onRefreshData={() => loadUserData(currentUser.id)}
+            />
           )}
 
           {activeTab === 'tracker' && (
@@ -1114,7 +1473,7 @@ export default function App() {
                   <div>
                     <h3 className="font-bold text-xs text-stone-600 mb-2">Recently Completed Tasks:</h3>
                     <div className="bg-stone-50 border border-stone-100 rounded-xl p-4 space-y-2.5">
-                      {tasks.filter(t => t.completed).map(t => (
+                      {mergedTasks.filter(t => t.completed).map(t => (
                         <div key={t.id} className="flex justify-between items-center text-xs">
                           <span className="font-semibold text-stone-700 line-through">{t.title}</span>
                           <span className="text-[10px] text-stone-400 font-mono">{t.date}</span>
@@ -1125,6 +1484,15 @@ export default function App() {
                 </div>
               </div>
             </div>
+          )}
+
+          {activeTab === 'goals' && currentUser && (
+            <SmartGoalPlanner 
+              currentUser={currentUser}
+              goals={goals}
+              setGoals={setGoals}
+              userRepository={userRepository}
+            />
           )}
 
           {activeTab === 'profile' && currentUser && (

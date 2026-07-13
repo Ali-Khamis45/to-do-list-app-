@@ -6,7 +6,10 @@ import {
   RelationalDailyProgress, 
   RelationalAchievement, 
   RelationalFocusSession,
-  RelationalNote
+  RelationalNote,
+  RelationalGoal,
+  RelationalIdea,
+  RelationalIdeaLink
 } from './UserModel';
 
 export interface IUserRepository {
@@ -50,6 +53,21 @@ export interface IUserRepository {
   getNotesByUserId(userId: string): RelationalNote[];
   saveNote(userId: string, note: RelationalNote): void;
   deleteNote(userId: string, noteId: string): void;
+
+  // Goals Table
+  getGoalsByUserId(userId: string): RelationalGoal[];
+  saveGoal(userId: string, goal: RelationalGoal): void;
+  deleteGoal(userId: string, goalId: string): void;
+
+  // Ideas Table
+  getIdeasByUserId(userId: string): RelationalIdea[];
+  saveIdea(userId: string, idea: RelationalIdea): void;
+  deleteIdea(userId: string, ideaId: string): void;
+
+  // Idea Links Table
+  getIdeaLinksByUserId(userId: string): RelationalIdeaLink[];
+  saveIdeaLink(userId: string, link: RelationalIdeaLink): void;
+  deleteIdeaLink(userId: string, linkId: string): void;
 
   // Core Utilities
   seedDefaultUserData(userId: string): void;
@@ -305,6 +323,36 @@ export class UserRepository implements IUserRepository {
     this.saveTable('notes', notes);
   }
 
+  // --- Goals Table ---
+  public getGoalsByUserId(userId: string): RelationalGoal[] {
+    const goals = this.getTable<RelationalGoal>('goals');
+    return goals.filter(g => g.userId === userId);
+  }
+
+  public saveGoal(userId: string, goal: RelationalGoal): void {
+    const goals = this.getTable<RelationalGoal>('goals');
+    const index = goals.findIndex(g => g.id === goal.id);
+    
+    const cleanGoal = { ...goal, userId };
+    
+    if (index >= 0) {
+      if (goals[index].userId !== userId) throw new Error("Unauthorized data access");
+      goals[index] = cleanGoal;
+    } else {
+      goals.push(cleanGoal);
+    }
+    this.saveTable('goals', goals);
+  }
+
+  public deleteGoal(userId: string, goalId: string): void {
+    let goals = this.getTable<RelationalGoal>('goals');
+    const target = goals.find(g => g.id === goalId);
+    if (target && target.userId !== userId) throw new Error("Unauthorized data deletion");
+    
+    goals = goals.filter(g => g.id !== goalId);
+    this.saveTable('goals', goals);
+  }
+
   // --- Seeding Default Data (Isolated by UserId) ---
   public seedDefaultUserData(userId: string): void {
     const getRelativeDateString = (daysAgo: number): string => {
@@ -442,6 +490,345 @@ export class UserRepository implements IUserRepository {
       }
     ];
     defaultAchievements.forEach(a => this.saveAchievement(userId, a));
+
+    // Seed Goals
+    const defaultGoals: RelationalGoal[] = [
+      {
+        id: `g1-${userId}`,
+        userId,
+        title: 'Read 50 Books this Year',
+        description: 'Read a diverse set of novels, biographies, and technology books.',
+        goalType: 'numeric',
+        targetValue: 50,
+        currentValue: 10,
+        unit: 'books',
+        startDate: getRelativeDateString(100), // Day 100 today
+        targetDate: getRelativeDateString(-265), // 365 days total
+        priority: 'high',
+        category: 'Learning',
+        frequency: 'daily',
+        difficulty: 'medium',
+        estimatedMinutesPerUnit: 240,
+        status: 'active',
+        tags: ['books', 'education', 'reading'],
+        color: '#8b5cf6',
+        icon: 'BookOpen',
+        milestones: [
+          { id: `g1-m1-${userId}`, title: 'Curate a list of 50 books', completed: true, completedDate: getRelativeDateString(98) },
+          { id: `g1-m2-${userId}`, title: 'Read first 10 books', completed: true, completedDate: getRelativeDateString(12) },
+          { id: `g1-m3-${userId}`, title: 'Read 25 books', completed: false },
+          { id: `g1-m4-${userId}`, title: 'Read 50 books', completed: false }
+        ],
+        logs: [
+          { date: getRelativeDateString(90), value: 1, note: 'Finished Bio of Steve Jobs' },
+          { date: getRelativeDateString(80), value: 1, note: 'Finished Atomic Habits' },
+          { date: getRelativeDateString(70), value: 2, note: 'Read Dune and Dune Messiah' },
+          { date: getRelativeDateString(60), value: 1, note: 'Finished Clean Code' },
+          { date: getRelativeDateString(45), value: 2, note: 'Read Zero to One and The Lean Startup' },
+          { date: getRelativeDateString(30), value: 1, note: 'Finished High Output Management' },
+          { date: getRelativeDateString(15), value: 1, note: 'Finished Designing Data-Intensive Applications' },
+          { date: getRelativeDateString(5), value: 1, note: 'Finished Psychology of Money' }
+        ],
+        subGoals: [],
+        dependencies: [],
+        history: [
+          { id: `g1-h1-${userId}`, goalId: `g1-${userId}`, eventType: 'created', timestamp: new Date().toISOString(), description: 'Goal created' },
+          { id: `g1-h2-${userId}`, goalId: `g1-${userId}`, eventType: 'milestone_completed', timestamp: new Date().toISOString(), description: 'Completed milestone: Curate a list of 50 books' },
+          { id: `g1-h3-${userId}`, goalId: `g1-${userId}`, eventType: 'milestone_completed', timestamp: new Date().toISOString(), description: 'Completed milestone: Read first 10 books' }
+        ]
+      },
+      {
+        id: `g2-${userId}`,
+        userId,
+        title: 'Build SaaS Startup MVP',
+        description: 'Design and deploy a web-based productivity app to production.',
+        goalType: 'milestone',
+        targetValue: 6,
+        currentValue: 3,
+        unit: 'milestones',
+        startDate: getRelativeDateString(30),
+        targetDate: getRelativeDateString(-60), // 3 months total
+        priority: 'critical',
+        category: 'Business',
+        frequency: 'weekly',
+        difficulty: 'hard',
+        estimatedMinutesPerUnit: 120,
+        status: 'active',
+        tags: ['startup', 'saas', 'coding'],
+        color: '#ec4899',
+        icon: 'Compass',
+        milestones: [
+          { id: `g2-m1-${userId}`, title: 'Conduct market research and user interviews', completed: true, completedDate: getRelativeDateString(25) },
+          { id: `g2-m2-${userId}`, title: 'Create interactive Figma wireframes', completed: true, completedDate: getRelativeDateString(15) },
+          { id: `g2-m3-${userId}`, title: 'Build React frontend & Node backend MVP', completed: true, completedDate: getRelativeDateString(2) },
+          { id: `g2-m4-${userId}`, title: 'Launch beta testing to 50 users', completed: false },
+          { id: `g2-m5-${userId}`, title: 'Integrate Stripe billing plans', completed: false },
+          { id: `g2-m6-${userId}`, title: 'Get first 10 paying customers', completed: false }
+        ],
+        logs: [
+          { date: getRelativeDateString(25), value: 1, note: 'Milestone: Research done' },
+          { date: getRelativeDateString(15), value: 1, note: 'Milestone: Designs finalized' },
+          { date: getRelativeDateString(2), value: 1, note: 'Milestone: MVP code deploy' }
+        ],
+        subGoals: [],
+        dependencies: [`g3-${userId}`], // Depends on "Learn React Deeply"
+        history: [
+          { id: `g2-h1-${userId}`, goalId: `g2-${userId}`, eventType: 'created', timestamp: new Date().toISOString(), description: 'Goal created' },
+          { id: `g2-h2-${userId}`, goalId: `g2-${userId}`, eventType: 'milestone_completed', timestamp: new Date().toISOString(), description: 'Completed milestone: Conduct market research' }
+        ]
+      },
+      {
+        id: `g3-${userId}`,
+        userId,
+        title: 'Learn React Deeply',
+        description: 'Understand hooks, concurrent features, and state management.',
+        goalType: 'habit',
+        targetValue: 40,
+        currentValue: 25,
+        unit: 'lessons',
+        startDate: getRelativeDateString(50),
+        targetDate: getRelativeDateString(-10), // 60 days total
+        priority: 'medium',
+        category: 'Learning',
+        frequency: 'daily',
+        difficulty: 'medium',
+        estimatedMinutesPerUnit: 30,
+        status: 'active',
+        tags: ['react', 'programming', 'web'],
+        color: '#3b82f6',
+        icon: 'Code',
+        milestones: [
+          { id: `g3-m1-${userId}`, title: 'Learn Hooks and State', completed: true, completedDate: getRelativeDateString(40) },
+          { id: `g3-m2-${userId}`, title: 'Learn React Router & Redux', completed: true, completedDate: getRelativeDateString(20) },
+          { id: `g3-m3-${userId}`, title: 'Build a complex practice dashboard', completed: false }
+        ],
+        logs: Array.from({ length: 25 }).map((_, idx) => ({
+          date: getRelativeDateString(Math.min(48, idx * 2 + 1)),
+          value: 1,
+          note: `Completed lesson ${idx + 1}`
+        })),
+        subGoals: [],
+        dependencies: [],
+        history: [
+          { id: `g3-h1-${userId}`, goalId: `g3-${userId}`, eventType: 'created', timestamp: new Date().toISOString(), description: 'Goal created' }
+        ]
+      }
+    ];
+
+    defaultGoals.forEach(g => this.saveGoal(userId, g));
+
+    // Seed default Ideas
+    const defaultIdeas: RelationalIdea[] = [
+      {
+        id: `i1-${userId}`,
+        userId,
+        title: 'AI-Powered Fitness & Workout App',
+        content: 'A smart workout companion that adapts to weekly consistency logs, logs metrics, and schedules focus/exercise tasks dynamically.',
+        tags: ['health', 'fitness', 'workout', 'ai'],
+        createdAt: getRelativeDateString(15),
+        updatedAt: getRelativeDateString(15),
+        priority: 'high',
+        category: 'Health',
+        mood: 'energized',
+        favorite: true,
+        archived: false,
+        complexity: 6,
+        effort: 40,
+        relatedTech: ['React', 'TypeScript', 'Gemini AI API'],
+        isProject: true,
+        projectProgress: 35
+      },
+      {
+        id: `i2-${userId}`,
+        userId,
+        title: 'Diet & Meal Recommendation System',
+        content: 'A custom health organizer to recommend calorie intake and suggest dynamic recipes depending on fitness level.',
+        tags: ['health', 'diet', 'meal', 'nutrition'],
+        createdAt: getRelativeDateString(10),
+        updatedAt: getRelativeDateString(10),
+        priority: 'medium',
+        category: 'Health',
+        mood: 'calm',
+        favorite: false,
+        archived: false,
+        complexity: 5,
+        effort: 30,
+        relatedTech: ['React', 'Node.js', 'Express'],
+        isProject: false
+      },
+      {
+        id: `i3-${userId}`,
+        userId,
+        title: 'Food Delivery Drone Platform',
+        content: 'Autonomous drone shipping for fast deliveries in local city hubs, matching restaurants directly to drop spots.',
+        tags: ['food', 'delivery', 'startup', 'saas'],
+        createdAt: getRelativeDateString(20),
+        updatedAt: getRelativeDateString(18),
+        priority: 'low',
+        category: 'Business',
+        mood: 'inspired',
+        favorite: false,
+        archived: false,
+        complexity: 9,
+        effort: 120,
+        relatedTech: ['Python', 'Docker', 'PostgreSQL'],
+        isProject: false
+      },
+      {
+        id: `i4-${userId}`,
+        userId,
+        title: 'Restaurant Review & Booking Portal',
+        content: 'A curation space listing cooking menus, dining slots, and food delivery integrations.',
+        tags: ['food', 'restaurant', 'booking'],
+        createdAt: getRelativeDateString(5),
+        updatedAt: getRelativeDateString(5),
+        priority: 'medium',
+        category: 'Business',
+        mood: 'focused',
+        favorite: false,
+        archived: false,
+        complexity: 4,
+        effort: 20,
+        relatedTech: ['Next.js', 'TailwindCSS'],
+        isProject: false
+      },
+      {
+        id: `i5-${userId}`,
+        userId,
+        title: 'Duolingo for Software Engineering',
+        content: 'Bite-sized visual programming tutorials on React, state structures, and CSS systems.',
+        tags: ['learning', 'coding', 'study'],
+        createdAt: getRelativeDateString(2),
+        updatedAt: getRelativeDateString(2),
+        priority: 'high',
+        category: 'Learning',
+        mood: 'curious',
+        favorite: true,
+        archived: false,
+        complexity: 5,
+        effort: 25,
+        relatedTech: ['TypeScript', 'Vite', 'React'],
+        isProject: false
+      }
+    ];
+
+    defaultIdeas.forEach(i => this.saveIdea(userId, i));
+
+    // Seed default Idea Links
+    const defaultLinks: RelationalIdeaLink[] = [
+      {
+        id: `l1-${userId}`,
+        userId,
+        sourceIdeaId: `i2-${userId}`,
+        targetIdeaId: `i1-${userId}`,
+        type: 'similar_to'
+      },
+      {
+        id: `l2-${userId}`,
+        userId,
+        sourceIdeaId: `i4-${userId}`,
+        targetIdeaId: `i3-${userId}`,
+        type: 'depends_on'
+      }
+    ];
+
+    defaultLinks.forEach(l => this.saveIdeaLink(userId, l));
+
+    // Seed default project tasks (associated with the project idea "AI-Powered Fitness & Workout App")
+    const projectTasks: RelationalTask[] = [
+      {
+        id: `pt-i1-1-${userId}`,
+        userId,
+        title: 'AI-Powered Fitness & Workout App - System Setup & Wireframes',
+        time: '10:00',
+        subtext: 'Configure repository, directory structures, and UI layout wireframes. (Estimated: 4h)',
+        completed: true,
+        date: getRelativeDateString(2),
+        category: 'Health',
+        priority: 'high',
+        notes: 'Project Task Generated from Idea: "AI-Powered Fitness & Workout App"',
+        createdAt: getRelativeDateString(2),
+        projectId: `i1-${userId}`,
+        ideaId: `i1-${userId}`
+      },
+      {
+        id: `pt-i1-2-${userId}`,
+        userId,
+        title: 'AI-Powered Fitness & Workout App - DB modeling',
+        time: '11:00',
+        subtext: 'Map repository types, local storage keys, and isolate user profiles. (Estimated: 3h)',
+        completed: false,
+        date: getRelativeDateString(0),
+        category: 'Health',
+        priority: 'medium',
+        notes: 'Project Task Generated from Idea: "AI-Powered Fitness & Workout App"',
+        createdAt: getRelativeDateString(0),
+        projectId: `i1-${userId}`,
+        ideaId: `i1-${userId}`
+      },
+      {
+        id: `pt-i1-3-${userId}`,
+        userId,
+        title: 'AI-Powered Fitness & Workout App - Core layout screen',
+        time: '14:30',
+        subtext: 'Build responsive glassmorphic cards, checklists, and navigation menus. (Estimated: 6h)',
+        completed: false,
+        date: getRelativeDateString(0),
+        category: 'Health',
+        priority: 'medium',
+        notes: 'Project Task Generated from Idea: "AI-Powered Fitness & Workout App"',
+        createdAt: getRelativeDateString(0),
+        projectId: `i1-${userId}`,
+        ideaId: `i1-${userId}`
+      }
+    ];
+    
+    projectTasks.forEach(t => this.saveTask(userId, t));
+  }
+
+  // --- Ideas Table ---
+  public getIdeasByUserId(userId: string): RelationalIdea[] {
+    return this.getTable<RelationalIdea>('ideas').filter(i => i.userId === userId);
+  }
+
+  public saveIdea(userId: string, idea: RelationalIdea): void {
+    const ideas = this.getTable<RelationalIdea>('ideas');
+    const index = ideas.findIndex(i => i.id === idea.id);
+    if (index >= 0) {
+      ideas[index] = idea;
+    } else {
+      ideas.push(idea);
+    }
+    this.saveTable('ideas', ideas);
+  }
+
+  public deleteIdea(userId: string, ideaId: string): void {
+    const ideas = this.getTable<RelationalIdea>('ideas').filter(i => i.id !== ideaId || i.userId !== userId);
+    this.saveTable('ideas', ideas);
+    // Also delete any associated links
+    const links = this.getTable<RelationalIdeaLink>('idea_links').filter(l => l.sourceIdeaId !== ideaId && l.targetIdeaId !== ideaId);
+    this.saveTable('idea_links', links);
+  }
+
+  // --- Idea Links Table ---
+  public getIdeaLinksByUserId(userId: string): RelationalIdeaLink[] {
+    return this.getTable<RelationalIdeaLink>('idea_links').filter(l => l.userId === userId);
+  }
+
+  public saveIdeaLink(userId: string, link: RelationalIdeaLink): void {
+    const links = this.getTable<RelationalIdeaLink>('idea_links');
+    const index = links.findIndex(l => l.id === link.id);
+    if (index >= 0) {
+      links[index] = link;
+    } else {
+      links.push(link);
+    }
+    this.saveTable('idea_links', links);
+  }
+
+  public deleteIdeaLink(userId: string, linkId: string): void {
+    const links = this.getTable<RelationalIdeaLink>('idea_links').filter(l => l.id !== linkId || l.userId !== userId);
+    this.saveTable('idea_links', links);
   }
 
   public resetAllUserData(userId: string): void {
@@ -464,6 +851,15 @@ export class UserRepository implements IUserRepository {
     let notes = this.getTable<RelationalNote>('notes').filter(n => n.userId !== userId);
     this.saveTable('notes', notes);
     
+    let goals = this.getTable<RelationalGoal>('goals').filter(g => g.userId !== userId);
+    this.saveTable('goals', goals);
+
+    let ideas = this.getTable<RelationalIdea>('ideas').filter(i => i.userId !== userId);
+    this.saveTable('ideas', ideas);
+
+    let links = this.getTable<RelationalIdeaLink>('idea_links').filter(l => l.userId !== userId);
+    this.saveTable('idea_links', links);
+
     // Re-seed default pristine empty structure or clean default state for user
     this.seedDefaultUserData(userId);
   }

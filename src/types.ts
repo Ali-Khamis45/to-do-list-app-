@@ -28,6 +28,8 @@ export interface Task {
   repeatType?: string; // e.g. 'none' | 'daily' | 'weekly' | 'monthly'
   notes?: string;
   createdAt: string; // YYYY-MM-DD
+  projectId?: string; // Links task to a project (Idea)
+  ideaId?: string; // Links task to a source idea
   logs: Record<string, TaskStatus>; // key: YYYY-MM-DD
 }
 
