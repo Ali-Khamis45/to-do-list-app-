@@ -127,9 +127,9 @@ The application features a production-grade, reasoning-first AI Operating System
 
 ### 🎥 Screenshots in Action
 
-| Emotional Support & Dialogue Planning | Task Suggestion Confirmation | Dashboard Task Synchronization |
-|:---:|:---:|:---:|
-| ![AI Coach Conversation](assets/screenshots/ai_coach_conversation.png) | ![Task Suggestion Cards](assets/screenshots/tasks_added_success.png) | ![Chatbot Task Checklist](assets/screenshots/chatbot_checklist.png) |
+| Emotional Support & Dialogue Planning | Task Suggestion Confirmation | Dashboard Task Synchronization | Prompt Evaluation Dashboard |
+|:---:|:---:|:---:|:---:|
+| ![AI Coach Conversation](assets/screenshots/ai_coach_conversation.png) | ![Task Suggestion Cards](assets/screenshots/tasks_added_success.png) | ![Chatbot Task Checklist](assets/screenshots/chatbot_checklist.png) | ![Prompt Evaluation](assets/screenshots/prompt_evaluation.png) |
 
 ---
 

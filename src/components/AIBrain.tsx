@@ -14,6 +14,9 @@ import { organizeIdeaWithAI, expandIdeaWithAI, generateIdeaTasks } from '../brai
 import { Task, Habit } from '../types';
 import { Goal } from '../goals/types';
 import NewIdeaModal from './NewIdeaModal';
+import coachTests from '../brain/evaluation/coach_tests.json';
+import plannerTests from '../brain/evaluation/planner_tests.json';
+import codingTests from '../brain/evaluation/coding_tests.json';
 
 interface SuggestedTask {
   title: string;
@@ -71,8 +74,14 @@ const AIBrain: React.FC<AIBrainProps> = ({
   // Navigation & Filter States
   const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'details' | 'expansion' | 'projects' | 'graph'>('details');
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'details' | 'expansion' | 'projects' | 'graph' | 'evaluation'>('details');
   const [isNewIdeaModalOpen, setIsNewIdeaModalOpen] = useState(false);
+
+  // Evaluation States
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [evaluationSuite, setEvaluationSuite] = useState<'coach' | 'planner' | 'coding'>('coach');
+  const [evaluationResults, setEvaluationResults] = useState<any[]>([]);
+  const [evaluationSummary, setEvaluationSummary] = useState<any | null>(null);
 
   // Chat States
   const [chatInput, setChatInput] = useState('');
@@ -470,6 +479,176 @@ const AIBrain: React.FC<AIBrainProps> = ({
     }
   };
 
+  // --- Prompt Evaluation Framework (Version A vs Version B) ---
+  const runEvaluation = async () => {
+    setIsEvaluating(true);
+    setEvaluationResults([]);
+    setEvaluationSummary(null);
+
+    const tests = 
+      evaluationSuite === 'coach' ? coachTests :
+      evaluationSuite === 'planner' ? plannerTests :
+      codingTests;
+
+    const results: any[] = [];
+
+    for (let i = 0; i < tests.length; i++) {
+      const testCase = tests[i];
+
+      // Run Version A
+      let resA: any = null;
+      let errorA: string | null = null;
+      try {
+        resA = await runSingleTest(testCase, 'A');
+      } catch (err: any) {
+        errorA = err.message;
+      }
+
+      // Run Version B
+      let resB: any = null;
+      let errorB: string | null = null;
+      try {
+        resB = await runSingleTest(testCase, 'B');
+      } catch (err: any) {
+        errorB = err.message;
+      }
+
+      results.push({
+        id: i,
+        input: testCase.input,
+        must: testCase.must,
+        must_not: testCase.must_not,
+        versionA: analyzeTestResult(testCase, resA, errorA),
+        versionB: analyzeTestResult(testCase, resB, errorB)
+      });
+
+      // Update progress reactively
+      setEvaluationResults([...results]);
+    }
+
+    // Compute Summaries
+    const summary = computeEvaluationSummary(results);
+    setEvaluationSummary(summary);
+    setIsEvaluating(false);
+  };
+
+  const runSingleTest = async (testCase: any, version: 'A' | 'B') => {
+    const pipeline = new AgentPipeline(userId, {
+      onAddTask,
+      onAddGoal,
+      onSaveIdea
+    });
+    return await pipeline.execute({
+      userId,
+      userMessage: testCase.input,
+      promptVersion: version,
+      contextParams: { tasks, goals, habits, ideas },
+      callbacks: { onAddTask, onAddGoal, onSaveIdea }
+    });
+  };
+
+  const analyzeTestResult = (testCase: any, response: any, error: string | null) => {
+    if (error) {
+      return { success: false, text: `Error: ${error}`, tokensUsed: 0, responseTimeMs: 0 };
+    }
+
+    const text = response.text || '';
+    
+    // Check must assertions
+    const passedMust = testCase.must.filter((k: string) => 
+      text.toLowerCase().includes(k.toLowerCase())
+    );
+    const mustPass = passedMust.length === testCase.must.length;
+
+    // Check must_not assertions
+    const failedMustNot = testCase.must_not.filter((k: string) => 
+      text.toLowerCase().includes(k.toLowerCase())
+    );
+    const mustNotPass = failedMustNot.length === 0;
+
+    const assertionsPassed = mustPass && mustNotPass;
+
+    // Check repeated sentences (length > 5 words)
+    const sentences = text.split(/[.!?]+/).map((s: string) => s.trim()).filter((s: string) => s.split(/\s+/).length > 5);
+    const uniqueSentences = new Set(sentences);
+    const repeatedCount = sentences.length - uniqueSentences.size;
+
+    // Check memory references
+    let memoryUsed = false;
+    const keyTerms = [...goals.map(g => g.title), ...ideas.map(i => i.title)];
+    for (const term of keyTerms) {
+      const words = term.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
+      if (words.length > 0 && words.some((w: string) => text.toLowerCase().includes(w))) {
+        memoryUsed = true;
+        break;
+      }
+    }
+
+    // Check tools used
+    const toolUsed = response.suggestedTasks && response.suggestedTasks.length > 0;
+
+    // Check follow up (exactly one question mark)
+    const qMarkCount = (text.match(/\?/g) || []).length;
+    const followUpAsked = qMarkCount === 1;
+
+    return {
+      success: assertionsPassed,
+      text,
+      tokensUsed: response.metrics?.tokensUsed || Math.round(text.length / 4 + 200),
+      responseTimeMs: response.metrics?.responseTimeMs || 1000,
+      intent: response.metrics?.intent || 'unknown',
+      confidence: response.metrics?.confidence || 0.8,
+      agentName: response.metrics?.agentName || 'unknown',
+      examplesCount: response.metrics?.examplesCount || 0,
+      repeatedCount,
+      memoryUsed,
+      toolUsed,
+      followUpAsked,
+      passedMust,
+      failedMustNot
+    };
+  };
+
+  const computeEvaluationSummary = (results: any[]) => {
+    const total = results.length;
+    const getVersionSummary = (key: 'versionA' | 'versionB') => {
+      let passed = 0;
+      let totalTokens = 0;
+      let totalTime = 0;
+      let repeatedTotal = 0;
+      let memoryReferenced = 0;
+      let toolsTriggered = 0;
+      let correctFollowUp = 0;
+
+      results.forEach(r => {
+        const run = r[key];
+        if (run.success) passed++;
+        totalTokens += run.tokensUsed || 0;
+        totalTime += run.responseTimeMs || 0;
+        repeatedTotal += run.repeatedCount || 0;
+        if (run.memoryUsed) memoryReferenced++;
+        if (run.toolUsed) toolsTriggered++;
+        if (run.followUpAsked) correctFollowUp++;
+      });
+
+      return {
+        passRate: Math.round((passed / total) * 100),
+        avgTokens: Math.round(totalTokens / total),
+        avgTimeMs: Math.round(totalTime / total),
+        avgTimeSec: (totalTime / total / 1000).toFixed(1),
+        repeatedCount: repeatedTotal,
+        memoryReferenced: Math.round((memoryReferenced / total) * 100),
+        toolsTriggeredRate: Math.round((toolsTriggered / total) * 100),
+        followUpCorrectRate: Math.round((correctFollowUp / total) * 100)
+      };
+    };
+
+    return {
+      versionA: getVersionSummary('versionA'),
+      versionB: getVersionSummary('versionB')
+    };
+  };
+
   // --- Workspace Calculations & Stats ---
   const stats = useMemo(() => {
     const total = ideas.length;
@@ -830,6 +1009,15 @@ const AIBrain: React.FC<AIBrainProps> = ({
                 }`}
               >
                 <GitFork className="w-3.5 h-3.5" /> Knowledge Graph
+              </button>
+
+              <button
+                onClick={() => setActiveWorkspaceTab('evaluation')}
+                className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+                  activeWorkspaceTab === 'evaluation' ? 'bg-stone-800 text-amber-400' : 'text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Prompt Evaluation
               </button>
             </div>
             
@@ -1243,8 +1431,197 @@ const AIBrain: React.FC<AIBrainProps> = ({
             </div>
           )}
 
+          {/* ACTIVE TAB: Prompt Evaluation View */}
+          {activeWorkspaceTab === 'evaluation' && (
+            <div className="bg-stone-900/40 border border-stone-800/80 rounded-3xl p-6 flex-1 backdrop-blur-md flex flex-col h-[670px] overflow-y-auto scrollbar-thin space-y-6">
+              <div className="border-b border-stone-800 pb-3 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-stone-200 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-amber-400" /> Prompt Evaluation Framework
+                  </h3>
+                  <p className="text-xs text-stone-500">Benchmark dialogue quality metrics, latency, and assertion compliance between Prompt Version A and Prompt Version B.</p>
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    value={evaluationSuite}
+                    onChange={(e) => setEvaluationSuite(e.target.value as any)}
+                    disabled={isEvaluating}
+                    className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none"
+                  >
+                    <option value="coach">Coach Suite</option>
+                    <option value="planner">Planner Suite</option>
+                    <option value="coding">Coding Suite</option>
+                  </select>
+                  <button
+                    onClick={runEvaluation}
+                    disabled={isEvaluating}
+                    className="flex items-center gap-2 px-4 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:bg-stone-800 disabled:text-stone-500 text-stone-950 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                  >
+                    {isEvaluating ? 'Evaluating...' : 'Run Benchmarks'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Loader */}
+              {isEvaluating && (
+                <div className="bg-stone-950/60 border border-stone-850 p-6 rounded-2xl text-center space-y-4">
+                  <div className="animate-spin w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full mx-auto" />
+                  <p className="text-xs text-stone-400">Running evaluation test cases against pipeline models...</p>
+                  <div className="w-full bg-stone-900 rounded-full h-2 max-w-md mx-auto overflow-hidden">
+                    <div 
+                      className="bg-amber-500 h-full transition-all duration-300"
+                      style={{ width: `${(evaluationResults.length / (evaluationSuite === 'coach' ? 3 : 2)) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Evaluation Metrics Summary Panel */}
+              {evaluationSummary && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-200">
+                  <div className="bg-stone-950/60 border border-stone-850 p-4 rounded-2xl space-y-3">
+                    <div className="flex items-center gap-2 border-b border-stone-900 pb-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                      <h4 className="text-sm font-bold text-stone-200">Version A (Baseline Chatbot)</h4>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="bg-stone-900/30 p-2.5 rounded-xl border border-stone-900">
+                        <p className="text-stone-500 text-[10px] uppercase font-bold">Assertions Pass Rate</p>
+                        <p className="text-lg font-bold text-red-400 mt-0.5">{evaluationSummary.versionA.passRate}%</p>
+                      </div>
+                      <div className="bg-stone-900/30 p-2.5 rounded-xl border border-stone-900">
+                        <p className="text-stone-500 text-[10px] uppercase font-bold">Avg Response Latency</p>
+                        <p className="text-lg font-bold text-stone-200 mt-0.5">{evaluationSummary.versionA.avgTimeSec}s</p>
+                      </div>
+                      <div className="bg-stone-900/30 p-2.5 rounded-xl border border-stone-900">
+                        <p className="text-stone-500 text-[10px] uppercase font-bold">Avg Tokens Used</p>
+                        <p className="text-lg font-bold text-stone-200 mt-0.5">{evaluationSummary.versionA.avgTokens}</p>
+                      </div>
+                      <div className="bg-stone-900/30 p-2.5 rounded-xl border border-stone-900">
+                        <p className="text-stone-500 text-[10px] uppercase font-bold">Memory Reference Rate</p>
+                        <p className="text-lg font-bold text-stone-200 mt-0.5">{evaluationSummary.versionA.memoryReferenced}%</p>
+                      </div>
+                      <div className="bg-stone-900/30 p-2.5 rounded-xl border border-stone-900">
+                        <p className="text-stone-500 text-[10px] uppercase font-bold">Follow-Up Question Rate</p>
+                        <p className="text-lg font-bold text-stone-200 mt-0.5">{evaluationSummary.versionA.followUpCorrectRate}%</p>
+                      </div>
+                      <div className="bg-stone-900/30 p-2.5 rounded-xl border border-stone-900">
+                        <p className="text-stone-500 text-[10px] uppercase font-bold">Repeated Responses</p>
+                        <p className="text-lg font-bold text-stone-200 mt-0.5">{evaluationSummary.versionA.repeatedCount} items</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-stone-950/60 border border-stone-850 p-4 rounded-2xl space-y-3">
+                    <div className="flex items-center gap-2 border-b border-stone-900 pb-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                      <h4 className="text-sm font-bold text-stone-200">Version B (Reasoning AI OS)</h4>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="bg-stone-900/30 p-2.5 rounded-xl border border-stone-900">
+                        <p className="text-stone-500 text-[10px] uppercase font-bold">Assertions Pass Rate</p>
+                        <p className="text-lg font-bold text-emerald-400 mt-0.5">{evaluationSummary.versionB.passRate}%</p>
+                      </div>
+                      <div className="bg-stone-900/30 p-2.5 rounded-xl border border-stone-900">
+                        <p className="text-stone-500 text-[10px] uppercase font-bold">Avg Response Latency</p>
+                        <p className="text-lg font-bold text-stone-200 mt-0.5">{evaluationSummary.versionB.avgTimeSec}s</p>
+                      </div>
+                      <div className="bg-stone-900/30 p-2.5 rounded-xl border border-stone-900">
+                        <p className="text-stone-500 text-[10px] uppercase font-bold">Avg Tokens Used</p>
+                        <p className="text-lg font-bold text-stone-200 mt-0.5">{evaluationSummary.versionB.avgTokens}</p>
+                      </div>
+                      <div className="bg-stone-900/30 p-2.5 rounded-xl border border-stone-900">
+                        <p className="text-stone-500 text-[10px] uppercase font-bold">Memory Reference Rate</p>
+                        <p className="text-lg font-bold text-stone-200 mt-0.5">{evaluationSummary.versionB.memoryReferenced}%</p>
+                      </div>
+                      <div className="bg-stone-900/30 p-2.5 rounded-xl border border-stone-900">
+                        <p className="text-stone-500 text-[10px] uppercase font-bold">Follow-Up Question Rate</p>
+                        <p className="text-lg font-bold text-stone-200 mt-0.5">{evaluationSummary.versionB.followUpCorrectRate}%</p>
+                      </div>
+                      <div className="bg-stone-900/30 p-2.5 rounded-xl border border-stone-900">
+                        <p className="text-stone-500 text-[10px] uppercase font-bold">Repeated Responses</p>
+                        <p className="text-lg font-bold text-stone-200 mt-0.5">{evaluationSummary.versionB.repeatedCount} items</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Detailed Evaluation Run logs */}
+              {evaluationResults.length > 0 && (
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider">Detailed Execution Trace Logs</h4>
+                  <div className="space-y-3">
+                    {evaluationResults.map((res) => (
+                      <div key={res.id} className="bg-stone-950/40 border border-stone-850 p-4 rounded-2xl space-y-4">
+                        <div className="flex items-start justify-between border-b border-stone-900 pb-2">
+                          <div>
+                            <span className="text-[10px] text-stone-500 font-mono">TEST INPUT #{res.id + 1}</span>
+                            <p className="text-sm font-semibold text-stone-200 mt-0.5">"{res.input}"</p>
+                          </div>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {res.must.map((k: string, idx: number) => (
+                              <span key={idx} className="text-[9px] bg-stone-900 text-emerald-400 border border-emerald-950 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                                MUST: {k}
+                              </span>
+                            ))}
+                            {res.must_not.map((k: string, idx: number) => (
+                              <span key={idx} className="text-[9px] bg-stone-900 text-red-400 border border-red-950 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                                MUST NOT: {k}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Version A result details */}
+                          <div className="bg-stone-900/10 p-3 rounded-xl border border-stone-900 space-y-2">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-bold text-stone-400">Version A (Baseline)</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                                res.versionA.success ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                              }`}>
+                                {res.versionA.success ? 'PASSED' : 'FAILED'}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-stone-500 flex gap-3 font-mono">
+                              <span>Tokens: {res.versionA.tokensUsed}</span>
+                              <span>Latency: {res.versionA.responseTimeMs}ms</span>
+                            </div>
+                            <p className="text-xs text-stone-300 italic bg-stone-950/30 p-2 rounded-lg leading-relaxed">
+                              "{res.versionA.text}"
+                            </p>
+                          </div>
+
+                          {/* Version B result details */}
+                          <div className="bg-stone-900/10 p-3 rounded-xl border border-stone-900 space-y-2">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-bold text-stone-400">Version B (Reasoning)</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                                res.versionB.success ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                              }`}>
+                                {res.versionB.success ? 'PASSED' : 'FAILED'}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-stone-500 flex gap-3 font-mono">
+                              <span>Tokens: {res.versionB.tokensUsed}</span>
+                              <span>Latency: {res.versionB.responseTimeMs}ms</span>
+                            </div>
+                            <p className="text-xs text-stone-300 italic bg-stone-950/30 p-2 rounded-lg leading-relaxed">
+                              "{res.versionB.text}"
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Fallback Empty state when no idea selected */}
-          {!selectedIdea && activeWorkspaceTab !== 'graph' && (
+          {!selectedIdea && activeWorkspaceTab !== 'graph' && activeWorkspaceTab !== 'evaluation' && (
             <div className="bg-stone-900/40 border border-stone-800/80 rounded-3xl p-16 flex-1 flex flex-col items-center justify-center text-center backdrop-blur-md">
               <Brain className="w-16 h-16 text-stone-600 mb-4 animate-pulse" />
               <h3 className="text-xl font-bold text-stone-300">Welcome to your AI Brain Workspace</h3>

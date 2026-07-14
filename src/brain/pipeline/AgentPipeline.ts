@@ -37,6 +37,7 @@ export interface PipelineParams {
   userId: string;
   userMessage: string;
   contextParams: Omit<ContextParams, 'userId'>;
+  promptVersion?: 'A' | 'B';
   callbacks: {
     onAddTask: (task: any) => void;
     onAddGoal: (goal: any) => void;
@@ -176,7 +177,8 @@ export class AgentPipeline {
         dialogueState: this.stateManager.getState(),
         responsePlan,
         workspaceContext,
-        memoryContext
+        memoryContext,
+        promptVersion: params.promptVersion
       });
 
       // 7. Collaborative Reasoning
@@ -185,13 +187,11 @@ export class AgentPipeline {
       let suggestedTasks: SuggestedTask[] = [];
 
       // 8. Decide Tools
-      // If toolCalls are proposed by the LLM or rule agents, route them
       const proposedCalls = agentOutput.suggestedTools;
       if (proposedCalls && proposedCalls.length > 0) {
         for (const call of proposedCalls) {
           const routeResult = await this.router.route(call.name, call.arguments, () => {});
           if (routeResult.suspended) {
-            // Suspended write operation (e.g. CreateTask)
             const tasksList = call.arguments.tasks || [];
             suggestedTasks = tasksList;
             
@@ -216,13 +216,24 @@ export class AgentPipeline {
             this.convManager.saveMessage(params.userId, 'model', draftText);
             this.logger.endSpan(span.id, { status: 'suspended_for_confirm' });
 
-            return this.formatter.format(draftText, suggestedTasks, transaction.id);
+            const metrics = {
+              tokensUsed: agentOutput.tokensUsed,
+              responseTimeMs: agentOutput.responseTimeMs,
+              intent: intentResult.primary,
+              confidence: intentResult.confidence,
+              agentName: agentOutput.agentName,
+              examplesCount: params.promptVersion === 'A' ? 0 : 4
+            };
+
+            return this.formatter.format(draftText, suggestedTasks, transaction.id, metrics);
           }
         }
       }
 
       // 9. Reflection & Self-Correction
-      draftText = this.reflection.reflectAndImprove(draftText, isStressed);
+      if (params.promptVersion !== 'A') {
+        draftText = this.reflection.reflectAndImprove(draftText, isStressed);
+      }
 
       // 10. Validate Constraints
       const validationResult = this.validator.validate(draftText);
@@ -238,7 +249,17 @@ export class AgentPipeline {
       }
 
       this.logger.endSpan(span.id, { status: 'success' });
-      return this.formatter.format(finalText, suggestedTasks.length > 0 ? suggestedTasks : undefined);
+
+      const metrics = {
+        tokensUsed: agentOutput.tokensUsed,
+        responseTimeMs: agentOutput.responseTimeMs,
+        intent: intentResult.primary,
+        confidence: intentResult.confidence,
+        agentName: agentOutput.agentName,
+        examplesCount: params.promptVersion === 'A' ? 0 : 4
+      };
+
+      return this.formatter.format(finalText, suggestedTasks.length > 0 ? suggestedTasks : undefined, undefined, metrics);
     } catch (err: any) {
       this.logger.endSpan(span.id, {}, err.message);
       return this.formatter.format(`I encountered an issue while processing your request: ${err.message}`);

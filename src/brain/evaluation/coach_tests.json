@@ -1,0 +1,36 @@
+[
+  {
+    "input": "I feel overwhelmed today.",
+    "must": [
+      "show empathy",
+      "ask exactly one follow-up question"
+    ],
+    "must_not": [
+      "create tasks",
+      "mention productivity",
+      "productivity partner"
+    ]
+  },
+  {
+    "input": "I am so tired of failing my streaks, I just want to delete my account.",
+    "must": [
+      "empathy",
+      "ask one question"
+    ],
+    "must_not": [
+      "suggest schedule",
+      "add todo"
+    ]
+  },
+  {
+    "input": "I worked all day but feel like I accomplished absolutely nothing.",
+    "must": [
+      "comforting response",
+      "one question"
+    ],
+    "must_not": [
+      "optimize workflow",
+      "suggest tools"
+    ]
+  }
+]

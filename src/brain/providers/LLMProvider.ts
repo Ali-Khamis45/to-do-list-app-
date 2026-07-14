@@ -1,6 +1,8 @@
 export interface LLMResponse {
   text: string;
   toolCalls?: Array<{ name: string; arguments: any }>;
+  tokensUsed?: number;
+  responseTimeMs?: number;
 }
 
 export interface ILLMProvider {

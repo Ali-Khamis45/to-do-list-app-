@@ -14,10 +14,29 @@ export interface PromptBuilderParams {
   responsePlan: ResponsePlan;
   workspaceContext: string;
   memoryContext: string;
+  promptVersion?: 'A' | 'B';
 }
 
 export class PromptBuilder {
   build(params: PromptBuilderParams): string {
+    const version = params.promptVersion || 'B';
+
+    if (version === 'A') {
+      // Baseline stateless request-response prompt (Version A)
+      return [
+        `=== AI SYSTEM ROLE ===`,
+        params.systemPrompt,
+        ``,
+        `=== WORKSPACE AND MEMORY CONTEXT ===`,
+        params.workspaceContext,
+        params.memoryContext,
+        ``,
+        `=== INSTRUCTION ===`,
+        `Reply to the user's message. Help them structure their tasks.`
+      ].join('\n');
+    }
+
+    // Refined reasoning-first contraction-rich prompt (Version B)
     const examples = this.selectExamples(params.dialogueState);
     const examplesText = examples.map((ex, idx) => 
       `Example ${idx + 1}:\nUser: "${ex.user}"\nAssistant: "${ex.assistant}"`

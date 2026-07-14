@@ -30,11 +30,13 @@ export class GeminiProvider implements ILLMProvider {
       config.tools = tools;
     }
 
+    const startTime = performance.now();
     const response = await this.client.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config
     });
+    const endTime = performance.now();
 
     const text = response.text || '';
     let toolCalls: LLMResponse['toolCalls'] | undefined;
@@ -47,7 +49,10 @@ export class GeminiProvider implements ILLMProvider {
       }));
     }
 
-    return { text, toolCalls };
+    const responseTimeMs = Math.round(endTime - startTime);
+    const tokensUsed = Math.round((prompt.length + (systemInstruction?.length || 0) + text.length) / 4);
+
+    return { text, toolCalls, tokensUsed, responseTimeMs };
   }
 
   async stream(

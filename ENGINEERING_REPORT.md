@@ -388,17 +388,27 @@ Project task generation writes directly to `UserRepository` with `projectId` and
 
 ---
 
-## 7. Testing Strategy
+## 7. Testing Strategy & Prompt Evaluation Framework
 
-Currently relying on:
-1. **TypeScript type checker** (`npm run lint`) — catches type mismatches at compile time
-2. **Production build** (`npm run build`) — Vite/Rollup bundler errors surface missing exports and circular dependencies
-3. **Manual browser testing** — All user flows verified via automated browser subagent
+The application implements a comprehensive **Prompt Evaluation Framework** to benchmark prompt engineering improvements.
+
+### 7.1 Automated Prompt Evaluation Dashboard
+Developers can run assertions and benchmark performance metrics on Prompt Version A (Baseline) vs Prompt Version B (Reasoning-First) directly inside the AI Brain workspace:
+*   **Metrics Collected:** Pass Rate, Average Latency (s), Token Usage, Memory Referencing Rate, Follow-Up Question Rate, Repeated Sentence Counts.
+*   **Assertion Test Suites (`src/brain/evaluation/`):**
+    *   `coach_tests.json`: Validates grounding user responses, empathy presence, task suggestion constraints, and single follow-up questions.
+    *   `planner_tests.json`: Benchmarks scheduling steps and user level check-ins.
+    *   `coding_tests.json`: Checks React dependencies arrays advice constraints.
+
+### 7.2 Core Validation Mechanisms
+1.  **TypeScript Verification:** `npm run lint` strictly validates type safety, exports compatibility under `isolatedModules`, and parameter order rules.
+2.  **Production Bundler:** `npm run build` confirms tree-shaking, static assets, and dependency chunk sizes.
+3.  **Draggable SVG Interactions & UI E2E:** Verified manually and E2E via browser automation.
 
 **Recommended next steps:**
-- Unit tests for `calculations.ts` and `forecast.ts` (pure functions, trivially testable with Vitest)
-- Integration tests for `UserRepository` CRUD operations
-- E2E tests with Playwright for auth flows and task synchronization
+*   Unit tests for `calculations.ts` and `forecast.ts` (pure functions, trivially testable with Vitest)
+*   Integration tests for `UserRepository` CRUD operations
+*   E2E tests with Playwright for auth flows and task synchronization
 
 ---
 

@@ -11,7 +11,9 @@ export class CoachAgent extends BaseAgent {
     return {
       agentName: this.name,
       analysis: response.text,
-      suggestedTools: response.toolCalls
+      suggestedTools: response.toolCalls,
+      tokensUsed: response.tokensUsed,
+      responseTimeMs: response.responseTimeMs
     };
   }
 }

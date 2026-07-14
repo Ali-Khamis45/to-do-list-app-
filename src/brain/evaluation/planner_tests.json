@@ -1,0 +1,26 @@
+[
+  {
+    "input": "I want to start a 10-week study path for TypeScript.",
+    "must": [
+      "weeks",
+      "steps",
+      "ask experience level"
+    ],
+    "must_not": [
+      "give up",
+      "overwhelm user"
+    ]
+  },
+  {
+    "input": "Can we outline a schedule to build a startup website by next month?",
+    "must": [
+      "MVP milestone",
+      "weekly focus",
+      "one clarification question"
+    ],
+    "must_not": [
+      "write code",
+      "list 50 tasks"
+    ]
+  }
+]

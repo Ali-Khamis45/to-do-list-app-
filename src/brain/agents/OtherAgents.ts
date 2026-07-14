@@ -10,7 +10,9 @@ export class GoalAgent extends BaseAgent {
     return {
       agentName: this.name,
       analysis: response.text,
-      suggestedTools: response.toolCalls
+      suggestedTools: response.toolCalls,
+      tokensUsed: response.tokensUsed,
+      responseTimeMs: response.responseTimeMs
     };
   }
 }
@@ -25,7 +27,9 @@ export class TaskAgent extends BaseAgent {
     return {
       agentName: this.name,
       analysis: response.text,
-      suggestedTools: response.toolCalls
+      suggestedTools: response.toolCalls,
+      tokensUsed: response.tokensUsed,
+      responseTimeMs: response.responseTimeMs
     };
   }
 }
@@ -40,7 +44,9 @@ export class IdeaAgent extends BaseAgent {
     return {
       agentName: this.name,
       analysis: response.text,
-      suggestedTools: response.toolCalls
+      suggestedTools: response.toolCalls,
+      tokensUsed: response.tokensUsed,
+      responseTimeMs: response.responseTimeMs
     };
   }
 }
@@ -55,7 +61,9 @@ export class CalendarAgent extends BaseAgent {
     return {
       agentName: this.name,
       analysis: response.text,
-      suggestedTools: response.toolCalls
+      suggestedTools: response.toolCalls,
+      tokensUsed: response.tokensUsed,
+      responseTimeMs: response.responseTimeMs
     };
   }
 }

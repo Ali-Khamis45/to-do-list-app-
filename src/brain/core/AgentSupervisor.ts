@@ -62,7 +62,7 @@ export class AgentSupervisor {
     return selected;
   }
 
-  async runCollaboration(agents: BaseAgent[], prompt: string, context: string): Promise<AgentOutput> {
+  async runCollaboration(agents: BaseAgent[], prompt: string, context: string, version: 'A' | 'B' = 'B'): Promise<AgentOutput> {
     const span = this.logger.startSpan('AgentSupervisor: runCollaboration', { agentsCount: agents.length });
     
     if (agents.length === 1) {
@@ -87,7 +87,9 @@ export class AgentSupervisor {
     const result: AgentOutput = {
       agentName: `${agents[0].name} + ${agents[1].name}`,
       analysis: secondaryOutput.analysis,
-      suggestedTools: mergedTools.length > 0 ? mergedTools : undefined
+      suggestedTools: mergedTools.length > 0 ? mergedTools : undefined,
+      tokensUsed: (primaryOutput.tokensUsed || 0) + (secondaryOutput.tokensUsed || 0),
+      responseTimeMs: (primaryOutput.responseTimeMs || 0) + (secondaryOutput.responseTimeMs || 0)
     };
 
     this.logger.endSpan(span.id, { resultLength: result.analysis?.length || 0 });

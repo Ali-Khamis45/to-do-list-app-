@@ -1,0 +1,25 @@
+[
+  {
+    "input": "I have an infinite loop in my react useEffect hook. How do I debug it?",
+    "must": [
+      "dependency array",
+      "state update",
+      "one follow-up question"
+    ],
+    "must_not": [
+      "blame browser",
+      "recommend redux"
+    ]
+  },
+  {
+    "input": "What's the best folder structure for a React + TypeScript project?",
+    "must": [
+      "components",
+      "services",
+      "assets"
+    ],
+    "must_not": [
+      "recommend nextjs only"
+    ]
+  }
+]

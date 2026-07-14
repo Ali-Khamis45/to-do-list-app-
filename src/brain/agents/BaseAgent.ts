@@ -7,6 +7,8 @@ export interface AgentOutput {
   mvpChecklist?: string[];
   technicalRoadmap?: string[];
   suggestedTools?: Array<{ name: string; arguments: any }>;
+  tokensUsed?: number;
+  responseTimeMs?: number;
 }
 
 export abstract class BaseAgent {

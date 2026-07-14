@@ -8,6 +8,19 @@ export class LocalProvider implements ILLMProvider {
     systemInstruction?: string,
     tools?: any[]
   ): Promise<LLMResponse> {
+    const startTime = performance.now();
+    const result = await this.innerGenerate(prompt, systemInstruction, tools);
+    const endTime = performance.now();
+    result.responseTimeMs = Math.round(endTime - startTime);
+    result.tokensUsed = Math.round((prompt.length + (systemInstruction?.length || 0) + (result.text?.length || 0)) / 4);
+    return result;
+  }
+
+  private async innerGenerate(
+    prompt: string,
+    systemInstruction?: string,
+    tools?: any[]
+  ): Promise<LLMResponse> {
     const q = prompt.toLowerCase().trim();
 
     // Check for task creation keywords
