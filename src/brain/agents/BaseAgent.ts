@@ -9,6 +9,11 @@ export interface AgentOutput {
   suggestedTools?: Array<{ name: string; arguments: any }>;
   tokensUsed?: number;
   responseTimeMs?: number;
+  handoff?: {
+    shouldHandoff: boolean;
+    nextAgent: string;
+    reason: string;
+  };
 }
 
 export abstract class BaseAgent {

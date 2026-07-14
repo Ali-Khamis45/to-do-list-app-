@@ -7,6 +7,7 @@ import { ResearchAgent } from '../agents/ResearchAgent';
 import { ProjectAgent } from '../agents/ProjectAgent';
 import { GoalAgent, TaskAgent, IdeaAgent, CalendarAgent } from '../agents/OtherAgents';
 import { IntentType } from './IntentClassifier';
+import { DialogueState } from './DialogueStateManager';
 import { Logger } from './Logger';
 
 export class AgentSupervisor {
@@ -28,19 +29,28 @@ export class AgentSupervisor {
     this.agents['calendar'] = new CalendarAgent(llm);
   }
 
-  // Decides which specialized agents should participate
-  selectAgents(intent: IntentType, prompt: string): BaseAgent[] {
+  /**
+   * Selects agent based on the top of the DialogueState agentStack,
+   * preserving conversational stack ownership.
+   */
+  selectAgents(intent: IntentType, prompt: string, state?: DialogueState): BaseAgent[] {
     const selected: BaseAgent[] = [];
-    const lower = prompt.toLowerCase();
+    
+    if (state && state.agentStack && state.agentStack.length > 0) {
+      const topAgentId = state.agentStack[state.agentStack.length - 1];
+      const primaryAgent = this.agents[topAgentId];
+      if (primaryAgent) {
+        selected.push(primaryAgent);
+        return selected;
+      }
+    }
 
-    // Mapping intent to default primary agent
+    // Fallback if no stack is provided
+    const lower = prompt.toLowerCase();
     if (intent === 'emotional_support') {
       selected.push(this.agents['coach']);
     } else if (intent === 'coding') {
       selected.push(this.agents['coding']);
-      if (lower.includes('plan') || lower.includes('schedule') || lower.includes('weeks')) {
-        selected.push(this.agents['planner']);
-      }
     } else if (intent === 'planning' || intent === 'learning') {
       selected.push(this.agents['planner']);
     } else if (intent === 'research') {
@@ -62,7 +72,53 @@ export class AgentSupervisor {
     return selected;
   }
 
-  async runCollaboration(agents: BaseAgent[], prompt: string, context: string, version: 'A' | 'B' = 'B'): Promise<AgentOutput> {
+  /**
+   * Process active agent handoff requests and updates the dialogue stack.
+   */
+  processHandoff(
+    output: AgentOutput,
+    state: DialogueState,
+    updateState: (updates: Partial<DialogueState>) => void
+  ): AgentOutput {
+    if (!output.handoff || !output.handoff.shouldHandoff) {
+      return output;
+    }
+
+    const { nextAgent, reason } = output.handoff;
+    const currentStack = [...state.agentStack];
+
+    console.log(`[Supervisor Handoff] Request to: ${nextAgent} (Reason: ${reason})`);
+
+    if (nextAgent === 'pop') {
+      if (currentStack.length > 1) {
+        currentStack.pop();
+      }
+    } else {
+      // Push next agent if not already on the stack
+      if (!currentStack.includes(nextAgent) && this.agents[nextAgent]) {
+        currentStack.push(nextAgent);
+      }
+    }
+
+    updateState({ agentStack: currentStack });
+    return output;
+  }
+
+  /**
+   * Triggers conversation repair if routing confidence is low to confirm intent.
+   */
+  applyRepairMessage(output: AgentOutput, topic?: string): AgentOutput {
+    const repairIntro = `I want to make sure I understood you correctly. So you're talking about ${
+      topic || 'your current goals'
+    }, right?\n\n`;
+    
+    return {
+      ...output,
+      analysis: output.analysis ? repairIntro + output.analysis : repairIntro + "Let me know how you'd like to proceed."
+    };
+  }
+
+  async runCollaboration(agents: BaseAgent[], prompt: string, context: string, _version: 'A' | 'B' = 'B'): Promise<AgentOutput> {
     const span = this.logger.startSpan('AgentSupervisor: runCollaboration', { agentsCount: agents.length });
     
     if (agents.length === 1) {
@@ -71,14 +127,11 @@ export class AgentSupervisor {
       return output;
     }
 
-    // Multi-Agent collaboration:
-    console.log(`[Supervisor] Collaborating between ${agents.map(a => a.name).join(' and ')}`);
+    // Multi-Agent collaboration
     const primaryOutput = await agents[0].run(prompt, context);
-
     const collaborationPrompt = `User prompt: "${prompt}"\n\nPrimary agent (${agents[0].name}) drafted this answer:\n"${primaryOutput.analysis || ''}"\n\nEnhance, refine, or review this answer according to your specialty (${agents[1].name}). Ensure the response stays clean, cohesive, and concise.`;
     const secondaryOutput = await agents[1].run(collaborationPrompt, context);
 
-    // Merge tool calls
     const mergedTools = [
       ...(primaryOutput.suggestedTools || []),
       ...(secondaryOutput.suggestedTools || [])
@@ -89,7 +142,8 @@ export class AgentSupervisor {
       analysis: secondaryOutput.analysis,
       suggestedTools: mergedTools.length > 0 ? mergedTools : undefined,
       tokensUsed: (primaryOutput.tokensUsed || 0) + (secondaryOutput.tokensUsed || 0),
-      responseTimeMs: (primaryOutput.responseTimeMs || 0) + (secondaryOutput.responseTimeMs || 0)
+      responseTimeMs: (primaryOutput.responseTimeMs || 0) + (secondaryOutput.responseTimeMs || 0),
+      handoff: primaryOutput.handoff || secondaryOutput.handoff
     };
 
     this.logger.endSpan(span.id, { resultLength: result.analysis?.length || 0 });

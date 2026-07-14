@@ -126,14 +126,50 @@ export class AgentPipeline {
       const intentResult = this.classifier.classify(params.userMessage);
       const entities = this.extractor.extract(params.userMessage);
 
-      // 3. Reason: Update active dialogue goals & sentiment
-      const activeGoal = this.stateManager.determineGoal(intentResult.primary, params.userMessage);
-      const isStressed = intentResult.primary === 'emotional_support';
+      // 3. Reason: Update active dialogue goals & stack
+      const { goal: activeGoal, primaryAgent } = this.stateManager.determineGoalAndAgent(
+        intentResult.primary,
+        params.userMessage,
+        intentResult.confidence,
+        dialogueHistory
+      );
+
+      const isStressed = activeGoal === 'grounding_user';
+      
+      // Calculate expectations and active topic based on agent
+      let activeTopic = this.stateManager.getState().activeTopic || 'general discussion';
+      let conversationObjective = this.stateManager.getState().conversationObjective || 'support user';
+      let assistantExpectation = this.stateManager.getState().assistantExpectation || 'await user thoughts';
+      let userExpectation = this.stateManager.getState().userExpectation || 'emotional connection';
+
+      if (primaryAgent === 'coach') {
+        activeTopic = 'emotional support & stress grounding';
+        conversationObjective = 'help user release stress and feel calmer';
+        assistantExpectation = 'waiting to hear details on the cause of overwhelm';
+        userExpectation = 'needs warm grounding support';
+      } else if (primaryAgent === 'planner') {
+        activeTopic = 'project planning & roadmapping';
+        conversationObjective = 'structure actionable roadmap schedules';
+        assistantExpectation = 'waiting for project deadlines or milestones feedback';
+        userExpectation = 'needs clear structured action steps';
+      } else if (primaryAgent === 'coding') {
+        activeTopic = 'react & typescript debugging';
+        conversationObjective = 'resolve code bugs and suggest clean patterns';
+        assistantExpectation = 'waiting for code snippet or exact error message';
+        userExpectation = 'needs typescript / react solutions';
+      }
+
       this.stateManager.updateState({
         activeGoal,
+        activeTopic,
+        conversationObjective,
+        assistantExpectation,
+        userExpectation,
         sentiment: isStressed ? 'stressed' : 'calm',
         turnsCount: this.stateManager.getState().turnsCount + 1
       });
+
+      const state = this.stateManager.getState();
 
       // 4. Plan: Response planning
       const responsePlan = this.planner.plan(activeGoal);
@@ -166,15 +202,14 @@ export class AgentPipeline {
         dialogueHistory.map(turn => `${turn.role === 'user' ? 'User' : 'Assistant'}: ${turn.text}`).join('\n')
       ].join('\n');
 
-      // 6. Prompt Builder: Build combined augmented instructions
-      const delegatedAgents = this.supervisor.selectAgents(intentResult.primary, params.userMessage);
+      // 6. Prompt Builder: Build combined instructions matching stack top
+      const delegatedAgents = this.supervisor.selectAgents(intentResult.primary, params.userMessage, state);
       
-      // Select prompt version
       const systemPrompt = `Select instructions for primary agent ${delegatedAgents[0].name}. Be warm, supportive, and conversational.`;
       
       const compiledPrompt = this.promptBuilder.build({
         systemPrompt,
-        dialogueState: this.stateManager.getState(),
+        dialogueState: state,
         responsePlan,
         workspaceContext,
         memoryContext,
@@ -182,7 +217,20 @@ export class AgentPipeline {
       });
 
       // 7. Collaborative Reasoning
-      const agentOutput = await this.supervisor.runCollaboration(delegatedAgents, params.userMessage, compiledPrompt);
+      let agentOutput = await this.supervisor.runCollaboration(delegatedAgents, params.userMessage, compiledPrompt);
+      
+      // Apply Conversation Repair if classification confidence is low
+      if (intentResult.confidence < 0.8 && intentResult.primary !== 'emotional_support') {
+        agentOutput = this.supervisor.applyRepairMessage(agentOutput, state.activeTopic);
+      }
+
+      // Process handoffs/releases
+      agentOutput = this.supervisor.processHandoff(
+        agentOutput,
+        this.stateManager.getState(),
+        (updates) => this.stateManager.updateState(updates)
+      );
+
       let draftText = agentOutput.analysis || 'I am processing your thoughts.';
       let suggestedTasks: SuggestedTask[] = [];
 
@@ -230,7 +278,6 @@ export class AgentPipeline {
                     logs: {}
                   });
                 });
-                return { success: true };
               });
 
               this.convManager.saveMessage(params.userId, 'model', draftText);
@@ -251,14 +298,42 @@ export class AgentPipeline {
         }
       }
 
-      // 9. Reflection & Self-Correction
+      // 9. Reflection & Self-Correction (with single retry limit)
+      let reflectionFail = false;
       if (params.promptVersion !== 'A') {
-        draftText = this.reflection.reflectAndImprove(draftText, isStressed);
+        const isClean = this.reflection.reflectAndImprove(draftText, isStressed);
+        if (isClean !== draftText) {
+          reflectionFail = true;
+          draftText = isClean;
+        }
+      }
+
+      // Retry exactly once if reflection modified/failed validation checks
+      if (reflectionFail) {
+        console.log('[Pipeline Reflection] Enforcing single retry loop limit.');
+        const retryOutput = await this.supervisor.runCollaboration(delegatedAgents, params.userMessage, compiledPrompt);
+        draftText = retryOutput.analysis || draftText;
       }
 
       // 10. Validate Constraints
       const validationResult = this.validator.validate(draftText);
       const finalText = validationResult.cleanedText;
+
+      // Update expectations and pending questions for the next turn
+      let pendingQuestion = '';
+      let expectedInformation = '';
+      if (primaryAgent === 'coach') {
+        pendingQuestion = 'What made today stressful?';
+        expectedInformation = 'stress_reason';
+      } else if (primaryAgent === 'planner') {
+        pendingQuestion = 'What project details or timeline preferences do you have?';
+        expectedInformation = 'project_details';
+      }
+
+      this.stateManager.updateState({
+        pendingQuestion,
+        expectedInformation
+      });
 
       // Log assistant reply to history
       this.convManager.saveMessage(params.userId, 'model', finalText);
@@ -283,7 +358,7 @@ export class AgentPipeline {
       return this.formatter.format(finalText, suggestedTasks.length > 0 ? suggestedTasks : undefined, undefined, metrics);
     } catch (err: any) {
       this.logger.endSpan(span.id, {}, err.message);
-      return this.formatter.format(`I encountered an issue while processing your request: ${err.message}`);
+      throw err;
     }
   }
 }

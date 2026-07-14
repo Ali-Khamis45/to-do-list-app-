@@ -160,6 +160,11 @@ export class LocalProvider implements ILLMProvider {
    * AND the parsed conversation/workspace context.
    */
   private generateContextualResponse(userMsg: string, q: string, ctx: ParsedContext): LLMResponse {
+    // Keep emotional conversation stable
+    if (ctx.activeGoal === 'grounding_user') {
+      return this.generateEmpathyResponse(ctx);
+    }
+
     // --- Topic-specific responses ---
 
     // Coding/tech questions
