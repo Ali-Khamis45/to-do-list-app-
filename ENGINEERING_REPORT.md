@@ -195,74 +195,79 @@ Returns a structured `CoachBriefing` with: `greeting`, `summary`, `dailyTarget`,
 
 ---
 
-### 3.3 AI Brain Workspace (`src/brain/`)
+### 3.3 Autonomous Reasoning AI Operating System & Brain Workspace (`src/brain/`)
 
-#### `types.ts` — Idea Domain Types
+The core AI capability of the system is designed around a multi-layered **Autonomous Reasoning-First AI Operating System (AI OS)**. It operates as a multi-step cognitive pipeline executing turn-based understanding, planning, reasoning, reflection, validation, and execution.
 
-```typescript
-interface Idea {
-  id, userId, title, content
-  tags: string[]
-  priority: 'low' | 'medium' | 'high'
-  category: string
-  mood?: string
-  favorite: boolean
-  archived: boolean
-  complexity?: number        // 1–10 scale
-  effort?: number            // Estimated hours
-  relatedTech?: string[]
-  clusterId?: string         // Auto-assigned by clustering
-  isProject?: boolean
-  projectProgress?: number   // 0–100%
-}
+#### 3.3.1 Cognitive Pipeline Flow
 
-interface IdeaLink {
-  type: 'depends_on' | 'extends' | 'similar_to'
-}
+The AI Operating System processes every user input message through a 10-step pipeline located in the `AgentPipeline` class:
+1.  **Context Retrieval & Optimization:** The `ConversationManager` pulls the last 12 turns of active dialogue. Turns beyond this limit are processed by the `ConversationSummarizer` to create a concise historical context briefing.
+2.  **Intent Classification & NLP Extraction:** The `IntentClassifier` analyzes the input (identifying prompts such as emotional support, task additions, project expansions). Concurrently, the `EntityExtractor` extracts dates, priorities, categories, and technology tags.
+3.  **Dialogue State Determination:** The `DialogueStateManager` evaluates the active dialogue goal (e.g., MVP planning, roadmap breakdown, emotional support grounding) and detects user sentiment state (`stressed` vs. `calm`).
+4.  **Response Planning:** The `ResponsePlanner` maps the goal to a planned sequence of output steps (e.g. `validate_empathy → ask_clarification` or `break_down_phases → suggest_tasks`).
+5.  **Memory Retrieval & Semantic Ranking:** The `MemoryRetrievalRanker` scores the user's ideas and goals based on keyword density and tags, retrieving only the contextually relevant memories.
+6.  **Prompt Selection & Compilation:** The `PromptBuilder` merges system role prompts, workspace context, semantic memories, dialogue goals, and active response plans.
+7.  **Collaborative Reasoning:** The `AgentSupervisor` selects specialized agents (e.g., Coach, Planner, Coding, Research) depending on the message classification. The agents collaborate, return strongly typed structures, and the supervisor aggregates their outputs.
+8.  **Tool Routing & Write-Action Interception:** Tool calls are passed to the `ToolRouter`. Read tools run automatically. Write tools (like task creation) are intercepted by the `ConfirmationEngine`, which suspends execution and generates a transaction.
+9.  **Reflection & Self-Correction:** The `ReflectionEngine` filters the draft response against emotional coaching guidelines, checks for tone consistency, ensures contractions, and strips generic "productivity partner" placeholders.
+10. **Sanitization & Validation:** The `ResponseValidator` verifies constraint compliance, strips repeated content, and outputs the finalized response for formatting by the `ResponseFormatter`.
 
-interface IdeaExpansion {
-  relatedIdeas, improvements, risks, businessOpportunities,
-  challenges, features, mvpPlan, roadmap, suggestedTech,
-  learningResources, nextSteps, monetization, targetUsers,
-  competitors, usps, missingPieces, criticalQuestions
-}
-```
+---
 
-#### `searchEngine.ts` — Semantic Search
+#### 3.3.2 Module Structure & Architecture
 
-**Algorithm:**
-1. Tokenize query into words
-2. Expand each token using the semantic dictionary (thesaurus-style)
-3. Score each idea:
-   - Title match: **+10 points**
-   - Tag match: **+5 points**
-   - Content match: **+1.5 points per occurrence**
-4. Filter zero-score ideas, sort descending
+The architecture is divided into clear layers under `src/brain/`:
 
-**Auto-Clustering Algorithm:**
-- 5 predefined cluster specs with keyword lists
-- Ideas matched greedily against clusters by tag, category, and content
-- Remaining ideas fall into "General Notes & Concepts" cluster
-- Runs reactively via `useMemo` — zero cost on unchanged ideas
+##### 1. Core Reasoning Layers (`src/brain/core/`)
+*   **`AgentSupervisor`:** Coordinates agent task delegation. Runs multi-agent collaborations, merges suggested tool calls, and compiles unified response text.
+*   **`DialogueStateManager`:** Handles session turns and active dialogue goals, persisting state parameters to localStorage.
+*   **`ResponsePlanner`:** Maps dialogue goals to a predefined sequence of response steps that guide agent generation.
+*   **`PromptBuilder`:** Augments active templates with dialogue states, workspace parameters, and memory payloads.
+*   **`MemoryRetrievalRanker`:** Ranks historical ideas and goals using string matching, tags, and category weights to compile contextual snippets.
+*   **`ReflectionEngine`:** Self-corrects generated text to match a supportive friend persona, dynamically adapting the vocabulary to prevent generic customer support jargon.
+*   **`ResponseValidator`:** Performs final syntactic and semantic validation checks on generated strings.
+*   **`ConversationManager`:** Orchestrates turn saving, context retrieval, and window pruning.
+*   **`ConfirmationEngine`:** Suspends state modifications (such as task additions), generating a safe transaction token that must be approved in the UI.
 
-#### `aiService.ts` — AI Generation Engine
+##### 2. Specialized Collaborative Agents (`src/brain/agents/`)
+Specialized reasoning agents extend the `BaseAgent` class and communicate through a strongly typed structure containing analysis text, follow-up questions, and suggested tool invocations:
+*   **`CoachAgent`:** Reviews pacing and goal targets to construct daily recovery briefings.
+*   **`PlannerAgent`:** Maps out high-level project tasks, epics, and features.
+*   **`CodingAgent`:** Recommends technical design patterns, framework options, and architectures.
+*   **`ResearchAgent`:** Reviews market competition, target audiences, and suggests improvements.
+*   **`ProjectAgent`:** Coordinates project dates, deliverables, and metrics.
+*   **`IdeaAgent`:** Explores conceptual expansions, monetization avenues, and risks.
 
-Three exported async functions:
+##### 3. Persistence & Memory Manager (`src/brain/memory/`)
+*   **`UserMemory`:** Manages profile parameters, tracking favorite technologies, categories, and skills.
+*   **`ConversationMemory`:** Handles relational saving of dialogue history.
+*   **`IdeaMemory`:** Stores archived flags, favorite status, and cluster mappings.
+*   **`GoalMemory`:** Logs goal-related modifications and milestone status.
 
-**`organizeIdeaWithAI(idea)`**
-- Prompt: Classify, tag, estimate complexity/effort, summarize
-- Fallback: Keyword scanner assigns tags and estimates based on content patterns
-- Returns: `Partial<Idea>` with enriched fields
+##### 4. Tool Registry (`src/brain/tools/`)
+Tools extend a base class defining their parameters, execution logic, and permission level:
+*   **Read-Only (`permissionLevel: 'READ'`):** Automatically queries system states (`ListTasksTool`, `ListGoalsTool`, `ListIdeasTool`, `GetAnalyticsTool`, `SearchTool`).
+*   **Write-Mutation (`permissionLevel: 'WRITE'`):** Requires user confirmation to run (`CreateTaskTool`, `CreateGoalTool`, `CreateIdeaTool`, `ProjectTool`).
 
-**`expandIdeaWithAI(idea)`**
-- Prompt: Full product analysis across 17 dimensions
-- Fallback: Category-specific templates (Learning vs. Software/SaaS)
-- Returns: Full `IdeaExpansion` object
+##### 5. LLM Provider Layer (`src/brain/providers/`)
+*   **`GeminiProvider`:** Connects to the Google Gemini API using `@google/genai` to stream and generate content, supporting function calling schemas.
+*   **`LocalProvider`:** Operates offline, executing intent classifications, extracting tasks, checking emotional markers, and routing conversation flow deterministically.
 
-**`generateIdeaTasks(idea, targetDate)`**
-- Prompt: Generate 5 actionable project tasks
-- Fallback: 6 standard software project phases with hour estimates
-- Returns: `Task[]` ready to save directly to UserRepository
+---
+
+#### 3.3.3 Idea & Search Domain Logic
+
+##### `searchEngine.ts` — Semantic Search
+1. Tokenize query into words.
+2. Expand each token using the semantic dictionary (thesaurus-style matching).
+3. Score each idea: Title match (+10 pts), Tag match (+5 pts), Content match (+1.5 pts per occurrence).
+4. Filter zero-score ideas and sort descending.
+
+##### Auto-Clustering Algorithm
+*   Ideas are matched greedily against predefined cluster specifications (e.g. Technology, Health, Business) by tag, category, and content keywords.
+*   Remaining ideas fall into a default "General Notes & Concepts" cluster.
+*   Runs reactively using React `useMemo` hooks, avoiding any overhead on unchanged idea records.
 
 ---
 

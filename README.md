@@ -121,23 +121,96 @@ src/
 
 ---
 
-## 🧠 AI Brain — Second Brain Workspace
+## 🧠 Autonomous Reasoning AI Operating System (AI OS)
 
-The AI Brain transforms the app into a **personal knowledge management system** that actively thinks with you.
+The application features a production-grade, reasoning-first AI Operating System built as a multi-step cognitive pipeline. Rather than a stateless chat interface, it manages dialogue state, plans responses, retrieves relevant semantic context, reasons via collaborative agents, and self-corrects based on user cognitive states.
 
-### How It Works
+### 🎥 Screenshots in Action
 
-1. **Quick Capture** → Write an idea in seconds via the capture modal
-2. **AI Auto-Organization** → The AI classifies, tags, estimates complexity and effort
-3. **Automatic Clustering** → Related ideas group into clusters (Food Tech, Health & Fitness, etc.)
-4. **Semantic Search** → Search "food" and find restaurant, cooking, recipes, meal planner
-5. **Knowledge Graph** → Interactive SVG graph showing relationships between ideas
-6. **AI Expansion** → Get USPs, risks, MVP plan, roadmap, monetization for any idea
-7. **Task Generation** → Convert an idea into a full Epic → Feature → Task tree
-8. **Goal Conversion** → Promote any idea to a Smart Goal with milestones
-9. **AI Chat** → Ask "What should I work on next?" or "Show startup ideas"
+| Emotional Support & Dialogue Planning | Task Suggestion Confirmation | Dashboard Task Synchronization |
+|:---:|:---:|:---:|
+| ![AI Coach Conversation](assets/screenshots/ai_coach_conversation.png) | ![Task Suggestion Cards](assets/screenshots/tasks_added_success.png) | ![Chatbot Task Checklist](assets/screenshots/chatbot_checklist.png) |
 
-### Semantic Search Dictionary
+---
+
+### ⚙️ Cognitive Message Pipeline
+
+Every message is processed through a deterministic 10-step pipeline:
+
+```
+User Message
+    │
+    ▼
+1. History Retrieval (ConversationManager loads last 12 turns, Summarizer compresses old history)
+    │
+    ▼
+2. NLP Extraction (IntentClassifier routes core topic; EntityExtractor parses categories/tech tags)
+    │
+    ▼
+3. Dialogue State (DialogueStateManager updates turn counts, active dialogue goal, and sentiment)
+    │
+    ▼
+4. Response Planning (ResponsePlanner builds step-by-step strategy for the active dialogue goal)
+    │
+    ▼
+5. Memory Retrieval (MemoryRetrievalRanker scores & ranks ideas/goals by tag/keyword relevance)
+    │
+    ▼
+6. Prompt Compilation (PromptBuilder compiles state, plan, memory, and workspace context)
+    │
+    ▼
+7. Collaboration (AgentSupervisor orchestrates specialized agents returning typed outputs)
+    │
+    ▼
+8. Tool Decisions (ToolRouter intercepts write calls, ConfirmationEngine suspends for user approval)
+    │
+    ▼
+9. Self-Correction (ReflectionEngine reviews draft, adjusts empathy level, and checks constraints)
+    │
+    ▼
+10. Final Validation (ResponseValidator checks formatting, removes duplicates, renders final response)
+```
+
+---
+
+### 🧩 Core Reasoning Layers
+
+The implementation is structured inside `src/brain/core/` and `src/brain/memory/`:
+
+*   **Dialogue State Manager (`DialogueStateManager`):** Maintains the running state of the session, tracking the current user sentiment (e.g., `calm`, `stressed`), session active goal (e.g., `grounding_user`, `brainstorming_mvp`, `clarifying_roadmap`), and message count.
+*   **Response Planner (`ResponsePlanner`):** Formulates step-by-step plans for responses. If the user is overwhelmed, the planner enforces an empathetic response path (`validate_empathy → ask_clarification`); if planning a project, it maps progress paths (`suggest_actionable_milestones → request_tech_choices`).
+*   **Prompt Builder (`PromptBuilder`):** Merges systemic constraints, user preferences, active planning steps, and ranked context into a single prompt versioned to optimize model token limits.
+*   **Memory Retrieval Ranker (`MemoryRetrievalRanker`):** Implements semantic relevance scoring. Instead of supplying all notes, it scores and retrieves only the most relevant ideas and goals matching the parsed user keywords.
+*   **Reflection Engine (`ReflectionEngine`):** Acts as a cognitive review gate. It reviews generated text to enforce contractions (making the voice warm and conversational), strips out sterile productivity buzzwords (such as "productivity partner", "optimizing output") during user stress episodes, and keeps the text strictly human-like.
+*   **Response Validator (`ResponseValidator`):** Sanitizes and checks formatting, stripping repeated sentences or loops introduced by fallback providers.
+*   **Conversation Summarizer (`ConversationSummarizer`):** Merges and condenses historical dialogue turns beyond the 12-turn local window to prevent context overflow.
+
+---
+
+### 👥 Collaborative Multi-Agent System
+
+Specialized agents in `src/brain/agents/` collaborate to solve complex user prompts. Instead of returning raw strings, all agents communicate using a strongly typed **`AgentOutput`** schema:
+
+*   **Coach Agent:** Analyzes pacing, consistency, and progress logs to deliver target conversions and positive feedback.
+*   **Planner Agent:** Breaks high-level ideas down into actionable phases, epics, and features.
+*   **Idea Agent:** Brainstorms alternative concepts, business monetization plans, and feature requests.
+*   **Coding Agent:** Mentors on technology choices, architectures, and design patterns.
+*   **Project Agent:** Handles progress tracking, estimation, and target date scheduling.
+*   **Research Agent:** Conducts synthetic searching, analyzes competition, and identifies user pain points.
+*   **Supervisor (`AgentSupervisor`):** Evaluates intents, assigns primary/secondary agent sub-tasks, merges tool calls, and aggregates agent analyses into a cohesive output.
+
+---
+
+### 🔒 Permission-Based Tool Execution
+
+To ensure absolute safety, the system implements a strict read-write permission boundary:
+*   **Read-Only Tools:** (e.g. `ListTasksTool`, `ListGoalsTool`, `SearchTool`) execute automatically to build context.
+*   **Write-Mutation Tools:** (e.g. `CreateTaskTool`, `CreateGoalTool`) are intercepted by the **`ConfirmationEngine`**. Instead of mutating the database, the engine suspends the execution, generates a unique Transaction ID, and returns a suggested task payload to the UI.
+*   **UI Approval:** The user is shown interactive confirmation cards in the chat view. Upon approval, the pending transaction executes.
+
+---
+
+### 🧠 Semantic Search Dictionary
 
 The local search engine expands queries without requiring external APIs:
 
@@ -172,7 +245,7 @@ Goals are more than just targets — the planner **calculates exactly what you m
 - **Streak Counting** — Consecutive active logging days
 - **Health Score** — Composite metric: pace, consistency, recency
 
-### AI Coach
+### AI Coach integration
 
 When `VITE_GEMINI_API_KEY` is configured, the AI Coach generates:
 - Personalized briefings (morning summary)
