@@ -5,12 +5,28 @@ import {
   Calendar, Layers, Clock, TrendingUp, Target, Shield, HelpCircle, 
   ChevronRight, Award, History, Info, CheckSquare, Zap, Activity
 } from 'lucide-react';
+import { GoogleGenAI } from '@google/genai';
+import { AgentPipeline } from '../brain/pipeline/AgentPipeline';
+import { ConfirmationEngine } from '../brain/core/ConfirmationEngine';
 import { Idea, IdeaLink, IdeaCluster, IdeaExpansion, IdeaHistoryTimelineEvent } from '../brain/types';
 import { autoClusterIdeas, searchIdeas } from '../brain/searchEngine';
 import { organizeIdeaWithAI, expandIdeaWithAI, generateIdeaTasks } from '../brain/aiService';
-import { Task } from '../types';
+import { Task, Habit } from '../types';
 import { Goal } from '../goals/types';
 import NewIdeaModal from './NewIdeaModal';
+
+interface SuggestedTask {
+  title: string;
+  category?: string;
+  priority?: 'low' | 'medium' | 'high';
+}
+
+interface ChatMessage {
+  sender: 'user' | 'ai';
+  text: string;
+  timestamp: Date;
+  suggestedTasks?: SuggestedTask[];
+}
 
 interface AIBrainProps {
   userId: string;
@@ -18,6 +34,7 @@ interface AIBrainProps {
   ideaLinks: IdeaLink[];
   tasks: Task[];
   goals: Goal[];
+  habits: Habit[];
   onSaveIdea: (idea: Idea) => void;
   onDeleteIdea: (ideaId: string) => void;
   onSaveIdeaLink: (link: IdeaLink) => void;
@@ -42,6 +59,7 @@ const AIBrain: React.FC<AIBrainProps> = ({
   ideaLinks,
   tasks,
   goals,
+  habits,
   onSaveIdea,
   onDeleteIdea,
   onSaveIdeaLink,
@@ -58,9 +76,11 @@ const AIBrain: React.FC<AIBrainProps> = ({
 
   // Chat States
   const [chatInput, setChatInput] = useState('');
-  const [chatMessages, setChatMessages] = useState<{ sender: 'user' | 'ai'; text: string; timestamp: Date }[]>([
-    { sender: 'ai', text: 'Hello! I am your AI Second Brain. I have indexed all your ideas and project targets. Ask me to synthesize your goals, generate code roadmaps, or find similar ideas!', timestamp: new Date() }
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    { sender: 'ai', text: 'Hello! 👋 I\'m your AI Productivity Coach.\n\nI\'m here as your personal productivity partner to help you brainstorm ideas, plan goals, organize your schedule, or talk through a busy day when you feel overwhelmed.\n\nHow are you feeling today?', timestamp: new Date() }
   ]);
+  const [pendingTasksList, setPendingTasksList] = useState<SuggestedTask[]>([]);
+  const [pendingTxId, setPendingTxId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Expansion & Tasks States
@@ -290,71 +310,164 @@ const AIBrain: React.FC<AIBrainProps> = ({
     setSelectedIdeaId(null);
   };
 
-  // --- Chat Assistant Processor ---
-  const handleSendChatMessage = () => {
+  // --- Task extraction helper: parses numbered/bulleted lists from a message ---
+  const extractTasksFromMessage = (msg: string): string[] => {
+    const lines = msg.split(/\n|,(?=\s*(?:\d+[.):–-]|\*|-|•))/);
+    const tasks: string[] = [];
+
+    for (const line of lines) {
+      // Match: "1. task", "1) task", "- task", "• task", "* task", "1- task"
+      const match = line.match(/^[\s]*(?:\d+[.):–\-]|\*|-|•)\s*(.+)/);
+      if (match && match[1].trim().length > 2) {
+        tasks.push(match[1].trim());
+      }
+    }
+
+    // If no explicit list matches, check if it's introduced by a clear command/colon separator,
+    // e.g. "add tasks: buy milk, do laundry" or "remind me to: buy milk"
+    if (tasks.length === 0) {
+      const inlineTrigger = msg.match(/(?:(?:add|create|schedule|put|todo|tasks|remind me to)\s*:\s*)(.+)/i);
+      if (inlineTrigger) {
+        const parts = inlineTrigger[1].split(/,|and /i).map(s => s.replace(/^[\d.):–\-*•\s]+/, '').trim()).filter(s => s.length > 2);
+        tasks.push(...parts);
+      }
+    }
+
+    return tasks;
+  };
+
+  // --- Detect if the message is requesting task addition ---
+  const isTaskCreationIntent = (msg: string): boolean => {
+    const lower = msg.toLowerCase();
+    // 1. Numbered/bulleted list present
+    if (/(?:^|\n)\s*(?:\d+[.):–\-]|\*|-|•)\s+\S/m.test(msg)) return true;
+    
+    // 2. Explicit add/remind command prefix or task list label
+    if (/^\s*(?:add|create|schedule|put|todo|tasks|remind me to)\b/i.test(lower)) return true;
+    if (/(?:(?:add|create|schedule|put|todo|tasks|remind me to)\s*:\s*)/i.test(lower)) return true;
+    
+    return false;
+  };
+
+  // --- Propose suggested tasks confirmation action handlers ---
+  const handleAcceptSuggestedTasks = async (suggested: SuggestedTask[]) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    // Resolve transaction if ConfirmationEngine has it
+    const engine = ConfirmationEngine.getInstance();
+    if (pendingTxId) {
+      const tx = engine.getPending(pendingTxId);
+      if (tx) {
+        await tx.execute();
+        engine.resolve(pendingTxId);
+      }
+    } else {
+      // Fallback
+      suggested.forEach((t, idx) => {
+        onAddTask({
+          id: `ai-task-${Date.now()}-${idx}`,
+          title: t.title,
+          time: '09:00',
+          subtext: 'Added by AI Coach',
+          completed: false,
+          date: todayStr,
+          category: t.category || 'General',
+          priority: t.priority || 'medium',
+          createdAt: todayStr,
+          logs: {},
+        });
+      });
+    }
+
+    const taskTitles = suggested.map((t, idx) => `${idx + 1}. **${t.title}**`).join('\n');
+    setChatMessages(prev => [
+      ...prev,
+      {
+        sender: 'ai',
+        text: `Success! 🌟 I've added these tasks to your dashboard checklist:\n\n${taskTitles}\n\nWhat would you like to plan or work on next?`,
+        timestamp: new Date()
+      }
+    ]);
+    setPendingTasksList([]);
+    setPendingTxId(null);
+  };
+
+  const handleDeclineSuggestedTasks = () => {
+    const engine = ConfirmationEngine.getInstance();
+    if (pendingTxId) {
+      engine.resolve(pendingTxId);
+    }
+    setChatMessages(prev => [
+      ...prev,
+      {
+        sender: 'ai',
+        text: `No worries! I didn't add any tasks. Let me know what you'd like to work on instead.`,
+        timestamp: new Date()
+      }
+    ]);
+    setPendingTasksList([]);
+    setPendingTxId(null);
+  };
+
+  // --- Chat Assistant Processor (Empathetic Multi-Agent OS Pipeline) ---
+  const handleSendChatMessage = async () => {
     if (!chatInput.trim()) return;
 
     const userMsg = chatInput.trim();
     setChatMessages(prev => [...prev, { sender: 'user', text: userMsg, timestamp: new Date() }]);
     setChatInput('');
 
-    // Process user question locally matching stored ideas
-    setTimeout(() => {
-      const q = userMsg.toLowerCase();
-      let reply = '';
+    try {
+      const pipeline = new AgentPipeline(userId, {
+        onAddTask,
+        onAddGoal,
+        onSaveIdea
+      });
 
-      if (q.includes('startup') || q.includes('business')) {
-        const startupIdeas = ideas.filter(i => i.category === 'Business' || i.tags.includes('startup'));
-        if (startupIdeas.length > 0) {
-          reply = `Here are your startup ideas:\n` + startupIdeas.map(i => `• **${i.title}** (${i.priority} priority)`).join('\n') + `\n\nWhich one would you like to build an MVP plan for?`;
-        } else {
-          reply = "You don't have any ideas categorized under Business or Startup yet. You can capture one by clicking 'New Idea'!";
+      const response = await pipeline.execute({
+        userId,
+        userMessage: userMsg,
+        contextParams: {
+          tasks,
+          goals,
+          habits,
+          ideas
+        },
+        callbacks: {
+          onAddTask,
+          onAddGoal,
+          onSaveIdea
         }
-      } else if (q.includes('react') || q.includes('code') || q.includes('javascript') || q.includes('typescript')) {
-        const codingIdeas = ideas.filter(i => i.tags.includes('coding') || i.tags.includes('react') || i.title.toLowerCase().includes('react') || i.content.toLowerCase().includes('react'));
-        if (codingIdeas.length > 0) {
-          reply = `Found these coding/React ideas in your brain index:\n` + codingIdeas.map(i => `• **${i.title}** - suggested tech: ${i.relatedTech?.join(', ') || 'N/A'}`).join('\n');
-        } else {
-          reply = "I couldn't find any ideas referencing React or programming tags. Try tags like 'coding' on your next capture.";
-        }
-      } else if (q.includes('weekend') || q.includes('next') || q.includes('work')) {
-        // Recommend easiest high/medium priority favorite idea
-        const recommendation = ideas
-          .filter(i => !i.archived)
-          .sort((a, b) => (a.complexity || 5) - (b.complexity || 5))[0];
+      });
 
-        if (recommendation) {
-          reply = `Based on your idea index, I suggest building:\n**${recommendation.title}**\n\nIt has a complexity of **${recommendation.complexity || 5}/10** and is estimated at **${recommendation.effort || 20} hours** to MVP. Would you like to generate the project todo checklist for this?`;
-        } else {
-          reply = "You have no unarchived ideas to suggest. Add a quick capture first!";
-        }
-      } else if (q.includes('combine') || q.includes('merge')) {
-        // Combine ideas suggestions
-        const similar = ideas.filter(i => i.category === 'Health');
-        if (similar.length >= 2) {
-          reply = `I suggest merging:\n1. **${similar[0].title}**\n2. **${similar[1].title}**\n\nThey both focus on the health sector. We could compile them into a unified fitness suite. Let me know if I should merge them.`;
-        } else {
-          reply = "To suggest a merge, please capture more ideas sharing similar categories (like Health or Business).";
-        }
-      } else if (q.includes('highest') || q.includes('potential') || q.includes('business')) {
-        const premium = ideas.filter(i => i.priority === 'high' && i.category === 'Business')[0];
-        if (premium) {
-          reply = `The idea with the highest business potential is **${premium.title}** because it targeting a large market share and has clear monetization paths.`;
-        } else {
-          reply = "You don't have high priority Business ideas in your index. You can adjust the priority in the details panel.";
-        }
-      } else {
-        // Generic search fallback
-        const searchMatches = searchIdeas(ideas, userMsg);
-        if (searchMatches.length > 0) {
-          reply = `I searched your brain for "${userMsg}" and found these matches:\n` + searchMatches.map(i => `• **${i.title}**: ${i.content.substring(0, 80)}...`).join('\n');
-        } else {
-          reply = `I understand you're asking about "${userMsg}". Currently I am tracking ${ideas.length} ideas, ${ideaLinks.length} connections, and ${goals.length} active goals. Try asking 'Show startup ideas' or 'What should I work on next?'.`;
-        }
+      // Update states
+      if (response.suggestedTasks) {
+        setPendingTasksList(response.suggestedTasks);
+      }
+      if (response.pendingTransactionId) {
+        setPendingTxId(response.pendingTransactionId);
       }
 
-      setChatMessages(prev => [...prev, { sender: 'ai', text: reply, timestamp: new Date() }]);
-    }, 800);
+      setChatMessages(prev => [
+        ...prev,
+        {
+          sender: 'ai',
+          text: response.text,
+          timestamp: new Date(),
+          suggestedTasks: response.suggestedTasks
+        }
+      ]);
+    } catch (err: any) {
+      console.error('Pipeline execution error:', err);
+      setChatMessages(prev => [
+        ...prev,
+        {
+          sender: 'ai',
+          text: `I ran into an issue handling that: ${err.message}`,
+          timestamp: new Date()
+        }
+      ]);
+    }
   };
 
   // --- Workspace Calculations & Stats ---
@@ -580,16 +693,73 @@ const AIBrain: React.FC<AIBrainProps> = ({
             {/* Messages box */}
             <div className="flex-1 bg-stone-950/80 rounded-xl p-3 overflow-y-auto space-y-2 mb-2 text-xs scrollbar-thin border border-stone-900">
               {chatMessages.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-xl px-3 py-2 leading-relaxed ${
-                    msg.sender === 'user' 
-                      ? 'bg-amber-500 text-stone-950 font-medium rounded-tr-none' 
-                      : 'bg-stone-800/80 text-stone-200 rounded-tl-none border border-stone-800'
-                  }`}>
-                    {msg.text.split('\n').map((line, i) => (
-                      <p key={i} className="mb-0.5">{line}</p>
-                    ))}
+                <div key={idx} className="space-y-1">
+                  <div className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] rounded-xl px-3 py-2 leading-relaxed ${
+                      msg.sender === 'user' 
+                        ? 'bg-amber-500 text-stone-950 font-medium rounded-tr-none' 
+                        : 'bg-stone-800/80 text-stone-200 rounded-tl-none border border-stone-800'
+                    }`}>
+                      {msg.text.split('\n').map((line, i) => {
+                        // Render bold **text** and italic _text_ inline
+                        const parts = line.split(/(\*\*[^*]+\*\*|_[^_]+_)/g);
+                        return (
+                          <p key={i} className={i > 0 && line === '' ? 'mt-1' : 'mb-0.5'}>
+                            {parts.map((part, j) => {
+                              if (part.startsWith('**') && part.endsWith('**')) {
+                                return <strong key={j} className="font-bold">{part.slice(2, -2)}</strong>;
+                              }
+                              if (part.startsWith('_') && part.endsWith('_') && part.length > 2) {
+                                return <em key={j} className="italic opacity-80">{part.slice(1, -1)}</em>;
+                              }
+                              return <span key={j}>{part}</span>;
+                            })}
+                          </p>
+                        );
+                      })}
+                    </div>
                   </div>
+
+                  {msg.sender === 'ai' && msg.suggestedTasks && msg.suggestedTasks.length > 0 && (
+                    <div className="ml-2 mr-6 mt-1 p-2 bg-stone-900/60 border border-stone-850 rounded-xl space-y-2 animate-in fade-in duration-150">
+                      <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">Proposed Tasks Checklist:</p>
+                      <div className="space-y-1">
+                        {msg.suggestedTasks.map((t, tIdx) => (
+                          <div key={tIdx} className="flex items-center justify-between text-[11px] bg-stone-950/40 p-1.5 rounded-lg border border-stone-900">
+                            <span className="text-stone-200 font-medium">{t.title}</span>
+                            <div className="flex gap-1">
+                              {t.priority && (
+                                <span className={`text-[8px] px-1 rounded uppercase font-bold ${
+                                  t.priority === 'high' ? 'bg-red-950 text-red-400 border border-red-900/30' : 'bg-stone-800 text-stone-400'
+                                }`}>
+                                  {t.priority}
+                                </span>
+                              )}
+                              {t.category && (
+                                <span className="text-[8px] bg-stone-900 text-stone-500 px-1 rounded font-bold">
+                                  {t.category}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 justify-end pt-1">
+                        <button
+                          onClick={() => handleDeclineSuggestedTasks()}
+                          className="text-[10px] px-2.5 py-1 bg-stone-800 hover:bg-stone-750 text-stone-300 rounded-lg font-bold cursor-pointer"
+                        >
+                          Dismiss
+                        </button>
+                        <button
+                          onClick={() => handleAcceptSuggestedTasks(msg.suggestedTasks!)}
+                          className="text-[10px] px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-stone-950 rounded-lg font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[2.5]" /> Yes, Add Tasks
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               <div ref={chatEndRef} />
@@ -599,7 +769,7 @@ const AIBrain: React.FC<AIBrainProps> = ({
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Ask about AI, start-ups..."
+                placeholder='e.g. "I have: gym, read, call John" or "show my ideas"'
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSendChatMessage()}

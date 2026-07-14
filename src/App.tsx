@@ -1281,6 +1281,7 @@ export default function App() {
               ideaLinks={ideaLinks}
               tasks={tasks}
               goals={goals}
+              habits={habits}
               onSaveIdea={handleSaveIdea}
               onDeleteIdea={handleDeleteIdea}
               onSaveIdeaLink={handleSaveIdeaLink}

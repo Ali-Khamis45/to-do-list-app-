@@ -63,3 +63,9 @@ export interface IdeaExpansion {
   missingPieces: string[];
   criticalQuestions: string[];
 }
+
+export interface SuggestedTask {
+  title: string;
+  category?: string;
+  priority?: 'low' | 'medium' | 'high';
+}
