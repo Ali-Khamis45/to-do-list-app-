@@ -52,8 +52,8 @@ export class GeminiProvider implements ILLMProvider {
 
   async stream(
     prompt: string,
-    systemInstruction?: string,
-    onChunk: (text: string) => void
+    onChunk: (text: string) => void,
+    systemInstruction?: string
   ): Promise<LLMResponse> {
     if (!this.client) {
       throw new Error('Gemini API key is not configured.');

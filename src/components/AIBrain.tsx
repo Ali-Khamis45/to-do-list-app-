@@ -77,7 +77,7 @@ const AIBrain: React.FC<AIBrainProps> = ({
   // Chat States
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { sender: 'ai', text: 'Hello! 👋 I\'m your AI Productivity Coach.\n\nI\'m here as your personal productivity partner to help you brainstorm ideas, plan goals, organize your schedule, or talk through a busy day when you feel overwhelmed.\n\nHow are you feeling today?', timestamp: new Date() }
+    { sender: 'ai', text: 'Hey there! 👋 I\'m here to brainstorm ideas, help you sketch out plans, check in on your goals, or just talk things through if you\'re having a hectic day.\n\nHow\'s everything going with you?', timestamp: new Date() }
   ]);
   const [pendingTasksList, setPendingTasksList] = useState<SuggestedTask[]>([]);
   const [pendingTxId, setPendingTxId] = useState<string | null>(null);

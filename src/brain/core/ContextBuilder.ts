@@ -24,6 +24,10 @@ export class ContextBuilder {
       `Preferred work hours: ${prefs.workHoursStart} to ${prefs.workHoursEnd}`,
       prefs.skills.length > 0 ? `User skills: ${prefs.skills.join(', ')}` : '',
       prefs.favoriteTech.length > 0 ? `Favorite Tech: ${prefs.favoriteTech.join(', ')}` : '',
+      Object.keys(prefs.learningProgress || {}).length > 0 
+        ? `Learning Progress: ${Object.entries(prefs.learningProgress).map(([k, v]) => `${k} (${v}%)`).join(', ')}` 
+        : '',
+      prefs.frequentlyUsedCategories.length > 0 ? `Frequently Used Categories: ${prefs.frequentlyUsedCategories.join(', ')}` : '',
       params.currentFile ? `Active Workspace File open: ${params.currentFile}` : '',
       ``,
       `[Tasks Snapshot]`,

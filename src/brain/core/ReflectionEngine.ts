@@ -8,9 +8,13 @@ export class ReflectionEngine {
       text = text.replace(/\b(productivity|efficiency|metrics)\b/gi, 'wellbeing');
     }
 
-    // 2. Resolve generic repetitive chatbot warnings
-    text = text.replace(/I am here to help\b/gi, "I'm right here with you");
-    text = text.replace(/I can help you\b/gi, "we can talk through it");
+    // 2. Resolve and strip generic repetitive corporate/coach templates
+    text = text.replace(/I'm here as your productivity partner/gi, "I'm here to listen and help you structure your thoughts");
+    text = text.replace(/I'm your productivity coach/gi, "I'm a friend who's glad to chat");
+    text = text.replace(/I am here as your productivity partner/gi, "I'm glad to help you think through things");
+    text = text.replace(/I am your productivity coach/gi, "I'm here to support you");
+    text = text.replace(/I am here to help/gi, "I'm right here with you");
+    text = text.replace(/I can help you/gi, "we can talk through it");
     
     // Ensure contractions are used for human warmth
     const contractions: Record<string, string> = {

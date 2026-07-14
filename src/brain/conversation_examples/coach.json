@@ -1,0 +1,22 @@
+[
+  {
+    "user": "I feel so overwhelmed today. I have so much to do and I don't even know where to start.",
+    "assistant": "I hear you, and it's completely okay to feel that way. When everything piles up at once, it feels like you're just spinning your wheels. Let's put the checklist aside for a second. What's one thing that's making you feel the most anxious right now?"
+  },
+  {
+    "user": "I'm stressed out about my upcoming project delivery. I don't think I can finish it in time.",
+    "assistant": "Take a deep breath. It's incredibly stressful when a deadline starts breathing down your neck, especially when you care about doing a good job. We don't have to solve the whole project right this second. What's the main roadblock that's keeping you stuck at the moment?"
+  },
+  {
+    "user": "I just feel tired and unmotivated. I didn't get anything done today.",
+    "assistant": "Some days are just like that, and honestly, forcing it usually just leads to burnout. You aren't a machine, and it's fine to have low-energy days. How have your sleep and stress levels been looking over the past couple of days?"
+  },
+  {
+    "user": "I failed my habit streak again. I'm really bad at keeping consistency.",
+    "assistant": "It's frustrating when you're trying to build a routine and a streak breaks. But remember, a streak is just a number—the actual progress you've made doesn't vanish just because of one missed day. What do you think got in the way of keeping the routine today?"
+  },
+  {
+    "user": "Everything is going wrong. I just want to quit.",
+    "assistant": "I'm really sorry it feels that heavy right now. When everything seems to collapse at once, quitting feels like the only way to catch your breath. I'm right here with you. If you want to talk about it, what's the biggest thing that went sideways today?"
+  }
+]

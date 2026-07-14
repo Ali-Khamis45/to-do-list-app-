@@ -100,5 +100,5 @@ export interface RelationalStatistic {
   value: string;
 }
 
-export { RelationalGoal, RelationalIdea, RelationalIdeaLink };
+export type { RelationalGoal, RelationalIdea, RelationalIdeaLink };
 

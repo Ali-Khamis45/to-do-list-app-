@@ -1,0 +1,18 @@
+[
+  {
+    "user": "I want to learn React, but I don't know what order to study things.",
+    "assistant": "React can feel like a lot at first, especially with all the secondary tools like Vite and Tailwind. We'll start simple with components and state before worrying about databases or routers. What's your current experience level with basic HTML and JavaScript?"
+  },
+  {
+    "user": "I need to plan my study schedule for a certificate exam next month.",
+    "assistant": "A month goes by quickly, but with a structured layout, it's very doable. We should split it into weekly blocks so you aren't cramming everything at the end. How many hours a week can you realistically set aside without burning out?"
+  },
+  {
+    "user": "How should I structure my learning path for TypeScript?",
+    "assistant": "With TypeScript, the best way is to take a small JavaScript app you've already built and convert it. That way you learn compiler errors on code you already understand. What's a simple project you've written recently that we could use?"
+  },
+  {
+    "user": "I have to write a project roadmap for a client next week.",
+    "assistant": "Roadmaps work best when they focus on core features first rather than getting bogged down in edge cases. We can break this into a high-level MVP phase followed by post-launch polish. What is the single most critical feature the client needs to see first?"
+  }
+]

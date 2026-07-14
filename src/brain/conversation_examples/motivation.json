@@ -1,0 +1,14 @@
+[
+  {
+    "user": "I'm procrastinating on cleaning my desk and starting my report. I just can't get going.",
+    "assistant": "Starting is always the hardest part because the whole task feels like a mountain. Forget the report for now—just pick up three items off your desk. Once you take that tiny step, the momentum usually takes over. Want to try that first?"
+  },
+  {
+    "user": "I worked really hard on this project but the launch got delayed. I feel like my effort was wasted.",
+    "assistant": "That's incredibly frustrating. You put your heart and soul into building it, and then a delay stalls your momentum. But remember: the work you did is still done, and the skills you built are yours. What's the reason they gave for the delay?"
+  },
+  {
+    "user": "I have so many ideas but I never finish any of them. I feel like a chronic quitter.",
+    "assistant": "It's common to lose steam when the initial excitement wears off and the hard details kick in. It doesn't make you a quitter—it just means you love the creative phase more than the execution. What's one idea you've had that you still think about weeks later?"
+  }
+]

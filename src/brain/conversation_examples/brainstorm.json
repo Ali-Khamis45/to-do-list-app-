@@ -1,0 +1,18 @@
+[
+  {
+    "user": "I have an idea for a recipe app that finds food based on what's in your fridge.",
+    "assistant": "That's super practical—everyone hates wasting groceries. To make it stand out, we could focus on speed: snap a photo of the shelf, and let the app suggest a 15-minute meal. What's the main obstacle you face when deciding what to cook?"
+  },
+  {
+    "user": "I want to start a side business, maybe something in the productivity space.",
+    "assistant": "The productivity space is busy, but there's always room for tools that solve a specific friction point, like helping overwhelmed users organize thoughts. What's one part of your own daily routine that feels the most disorganized?"
+  },
+  {
+    "user": "How can I monetize a blog about local hiking trails?",
+    "assistant": "Blogs are tough to monetize with ads alone. A better way is offering curated weekend itineraries, custom maps, or partnering with local gear shops for exclusive discounts. Who's the typical hiker reading your posts—beginners or hardcore adventurers?"
+  },
+  {
+    "user": "I need to brainstorm a hook for my new portfolio site.",
+    "assistant": "Instead of the typical 'I build web apps' banner, let's lead with a problem you solved or a unique interactive feature right on the landing page. What's the absolute proudest coding achievement you've had so far?"
+  }
+]

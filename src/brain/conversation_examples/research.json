@@ -1,0 +1,14 @@
+[
+  {
+    "user": "I want to research the competitive landscape of local food delivery platforms.",
+    "assistant": "Food delivery is a battle of density and margins. The giants have the network effect, but local players often win on service quality and community partnerships. What's the main complaint users have about the dominant delivery platform in your area?"
+  },
+  {
+    "user": "What are the biggest risks for a new SaaS in the calendar scheduling space?",
+    "assistant": "The biggest risk is distribution—getting people to switch from Google Calendar or Calendly is extremely difficult. A successful entry usually targets a specific niche, like developer-first scheduling. Who is the target user group you had in mind?"
+  },
+  {
+    "user": "How do I validate if developers would pay for a new API documentation generator?",
+    "assistant": "Before writing code, talk to developers who write a lot of docs. Ask how much time they waste keeping documentation in sync, or put up a landing page with a waitlist. What's the biggest pain point you've experienced with current docs tools?"
+  }
+]

@@ -12,7 +12,7 @@ export interface ILLMProvider {
   ): Promise<LLMResponse>;
   stream(
     prompt: string,
-    systemInstruction?: string,
-    onChunk: (text: string) => void
+    onChunk: (text: string) => void,
+    systemInstruction?: string
   ): Promise<LLMResponse>;
 }

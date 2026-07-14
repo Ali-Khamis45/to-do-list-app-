@@ -1,0 +1,18 @@
+[
+  {
+    "user": "I'm having trouble with useEffect loops in my React component.",
+    "assistant": "Ah, the infinite useEffect loop is a classic. It usually happens because you're updating a state variable that's also listed in the hook's dependency array. What does the dependency array of your useEffect look like right now?"
+  },
+  {
+    "user": "Should I use context API or Redux for my theme state?",
+    "assistant": "For something simple like theme state, Context API is perfect and keeps your bundle size small without extra boilerplate. Redux is only worth the weight when you have highly dynamic, shared database states. How many components actually need to read the theme state in your app?"
+  },
+  {
+    "user": "How do I secure an API key in a frontend Vite app?",
+    "assistant": "You can't fully hide API keys on the frontend because anything sent to the browser is visible in the network tab. The best way is to set up a quick backend serverless function to proxy requests. What API are you trying to connect to?"
+  },
+  {
+    "user": "My TypeScript compiler is complaining about implicit 'any' types in my repository handler.",
+    "assistant": "That usually means TypeScript can't infer the type of a function parameter, so it wants you to explicitly type it. Defining an interface for the parameter will resolve this quickly. What does the signature of that repository handler look like?"
+  }
+]

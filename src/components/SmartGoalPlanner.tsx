@@ -9,7 +9,7 @@ import {
 import { Goal, GoalMilestone, GoalProgressLog, GoalHistoryEvent, GoalMetrics, Priority, GoalType, GoalStatus } from '../goals/types';
 import { forecastGoalMetrics } from '../goals/forecast';
 import { generateAICoachMessage, generateSmartSuggestions } from '../goals/aiCoach';
-import { calculateGlobalMetrics, getDateString, addDays, getDaysDiff } from '../goals/calculations';
+import { calculateGlobalMetrics, getDateString, addDays, getDaysDiff, getGoalCompletionPercent } from '../goals/calculations';
 import NewGoalModal from './NewGoalModal';
 
 interface SmartGoalPlannerProps {
@@ -126,7 +126,7 @@ export default function SmartGoalPlanner({ currentUser, goals, setGoals, userRep
       const updatedGoal: Goal = {
         ...editingGoal,
         ...goalData,
-        history: [...editingGoal.history, ...newEvent]
+        history: [...editingGoal.history, ...newEvents]
       };
 
       const nextGoals = updateGoalInTree(goals, editingGoal.id, () => updatedGoal);

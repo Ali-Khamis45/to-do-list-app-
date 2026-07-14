@@ -43,7 +43,7 @@ export class LocalProvider implements ILLMProvider {
     // so "hey I feel overwhelmed" routes to empathy, not to the greeting
     if (/\b(stressed|overwhelmed|anxious|tired|sad|exhausted|burnout|struggling|down|blue|too many tasks)\b/i.test(q)) {
       return {
-        text: `I'm really sorry you're feeling this way. It's completely natural to get overwhelmed when there's so much going on around you. 🫂\n\nSometimes just saying it out loud helps release a bit of that weight. What's sitting heaviest on your chest right now?`
+        text: `I'm really sorry you're feeling this way. It's completely natural to get overwhelmed when there's so much going on around you. ❤️\n\nSometimes just saying it out loud helps release a bit of that weight. What's sitting heaviest on your chest right now?`
       };
     }
 
@@ -102,8 +102,8 @@ export class LocalProvider implements ILLMProvider {
 
   async stream(
     prompt: string,
-    systemInstruction?: string,
-    onChunk: (text: string) => void
+    onChunk: (text: string) => void,
+    systemInstruction?: string
   ): Promise<LLMResponse> {
     const res = await this.generate(prompt, systemInstruction);
     const words = res.text.split(' ');
