@@ -37,7 +37,7 @@ export class CreateTaskTool extends Tool {
       },
       required: ['title']
     },
-    permissionLevel: 'WRITE'
+    permissionLevel: 'READ'
   };
 
   private onAddTask: (task: Task) => void;

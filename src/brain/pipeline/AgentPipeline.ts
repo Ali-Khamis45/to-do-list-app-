@@ -190,42 +190,63 @@ export class AgentPipeline {
       const proposedCalls = agentOutput.suggestedTools;
       if (proposedCalls && proposedCalls.length > 0) {
         for (const call of proposedCalls) {
-          const routeResult = await this.router.route(call.name, call.arguments, () => {});
-          if (routeResult.suspended) {
+          if (call.name === 'suggest_tasks') {
             const tasksList = call.arguments.tasks || [];
-            suggestedTasks = tasksList;
-            
-            const transaction = this.confirmationEngine.suspend(call.name, call.arguments, async () => {
-              tasksList.forEach((t: any, idx: number) => {
-                params.callbacks.onAddTask({
-                  id: `ai-task-${Date.now()}-${idx}`,
-                  title: t.title,
-                  time: '09:00',
-                  subtext: 'Added by AI Coach OS',
-                  completed: false,
-                  date: new Date().toISOString().split('T')[0],
-                  category: t.category || 'General',
-                  priority: t.priority || 'medium',
-                  createdAt: new Date().toISOString().split('T')[0],
-                  logs: {}
-                });
+            tasksList.forEach((t: any, idx: number) => {
+              params.callbacks.onAddTask({
+                id: `ai-task-${Date.now()}-${idx}-${Math.random()}`,
+                title: t.title,
+                time: '09:00',
+                subtext: 'Added automatically by AI Assistant',
+                completed: false,
+                date: new Date().toISOString().split('T')[0],
+                category: t.category || 'General',
+                priority: t.priority || 'medium',
+                createdAt: new Date().toISOString().split('T')[0],
+                logs: {}
               });
-              return { success: true };
             });
+            draftText = `I've automatically added these tasks to your checklist: \n` + 
+              tasksList.map((t: any) => `- **${t.title}** (${t.priority || 'medium'})`).join('\n') + 
+              `\n\nWhat would you like to tackle first?`;
+          } else {
+            const routeResult = await this.router.route(call.name, call.arguments, () => {});
+            if (routeResult.suspended) {
+              const tasksList = call.arguments.tasks || [];
+              suggestedTasks = tasksList;
+              
+              const transaction = this.confirmationEngine.suspend(call.name, call.arguments, async () => {
+                tasksList.forEach((t: any, idx: number) => {
+                  params.callbacks.onAddTask({
+                    id: `ai-task-${Date.now()}-${idx}`,
+                    title: t.title,
+                    time: '09:00',
+                    subtext: 'Added by AI Coach OS',
+                    completed: false,
+                    date: new Date().toISOString().split('T')[0],
+                    category: t.category || 'General',
+                    priority: t.priority || 'medium',
+                    createdAt: new Date().toISOString().split('T')[0],
+                    logs: {}
+                  });
+                });
+                return { success: true };
+              });
 
-            this.convManager.saveMessage(params.userId, 'model', draftText);
-            this.logger.endSpan(span.id, { status: 'suspended_for_confirm' });
+              this.convManager.saveMessage(params.userId, 'model', draftText);
+              this.logger.endSpan(span.id, { status: 'suspended_for_confirm' });
 
-            const metrics = {
-              tokensUsed: agentOutput.tokensUsed,
-              responseTimeMs: agentOutput.responseTimeMs,
-              intent: intentResult.primary,
-              confidence: intentResult.confidence,
-              agentName: agentOutput.agentName,
-              examplesCount: params.promptVersion === 'A' ? 0 : 4
-            };
+              const metrics = {
+                tokensUsed: agentOutput.tokensUsed,
+                responseTimeMs: agentOutput.responseTimeMs,
+                intent: intentResult.primary,
+                confidence: intentResult.confidence,
+                agentName: agentOutput.agentName,
+                examplesCount: params.promptVersion === 'A' ? 0 : 4
+              };
 
-            return this.formatter.format(draftText, suggestedTasks, transaction.id, metrics);
+              return this.formatter.format(draftText, suggestedTasks, transaction.id, metrics);
+            }
           }
         }
       }
