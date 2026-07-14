@@ -91,6 +91,7 @@ const AIBrain: React.FC<AIBrainProps> = ({
   const [pendingTasksList, setPendingTasksList] = useState<SuggestedTask[]>([]);
   const [pendingTxId, setPendingTxId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const pipelineRef = useRef<AgentPipeline | null>(null);
 
   // Expansion & Tasks States
   const [selectedExpansion, setSelectedExpansion] = useState<IdeaExpansion | null>(null);
@@ -427,13 +428,17 @@ const AIBrain: React.FC<AIBrainProps> = ({
     setChatInput('');
 
     try {
-      const pipeline = new AgentPipeline(userId, {
-        onAddTask,
-        onAddGoal,
-        onSaveIdea
-      });
+      // Reuse same pipeline instance across messages to preserve
+      // conversation history, dialogue state, and response deduplication
+      if (!pipelineRef.current) {
+        pipelineRef.current = new AgentPipeline(userId, {
+          onAddTask,
+          onAddGoal,
+          onSaveIdea
+        });
+      }
 
-      const response = await pipeline.execute({
+      const response = await pipelineRef.current.execute({
         userId,
         userMessage: userMsg,
         contextParams: {
