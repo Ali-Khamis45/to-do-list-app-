@@ -12,6 +12,10 @@ export class ConversationManager {
     return this.memory.getRecentContext(convId, this.maxContextTurns);
   }
 
+  getFullHistory(convId: string): DialogTurn[] {
+    return this.memory.getConversation(convId)?.turns || [];
+  }
+
   saveMessage(convId: string, role: 'user' | 'model', text: string): void {
     const titleFallback = text.length > 25 ? text.substring(0, 25) + '...' : text;
     this.memory.saveTurn(convId, {

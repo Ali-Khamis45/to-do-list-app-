@@ -1,0 +1,91 @@
+[
+  {
+    "scenario": "topic_drift_planning_then_coding_then_back",
+    "turns": [
+      {
+        "input": "Can you help me build a 6-week plan to launch my React todo app?",
+        "expectActiveGoal": "planning_roadmap",
+        "expectAgentStackTop": "planner",
+        "expectActiveTopicContains": "planning",
+        "must": ["week"],
+        "must_not": ["hello! i'm your ai assistant"]
+      },
+      {
+        "input": "Quick interruption - I have a React useEffect infinite loop bug, can you help?",
+        "expectAgentStackTop": "coding",
+        "expectActiveTopicContains": "debugging",
+        "must": ["useEffect"],
+        "must_not": []
+      },
+      {
+        "input": "Thanks that worked, let's go back to planning the launch.",
+        "expectAgentStackTop": "planner",
+        "expectActiveTopicContains": "planning",
+        "must": [],
+        "must_not": []
+      }
+    ]
+  },
+  {
+    "scenario": "coding_interruption_mid_plan",
+    "turns": [
+      {
+        "input": "Help me plan out a 10-week roadmap for my startup MVP.",
+        "expectActiveGoal": "planning_roadmap",
+        "expectAgentStackTop": "planner",
+        "must": ["week"],
+        "must_not": []
+      },
+      {
+        "input": "Okay phase one sounds good. What should I tackle first each week?",
+        "expectAgentStackTop": "planner",
+        "must": [],
+        "must_not": []
+      },
+      {
+        "input": "Wait, before that - I'm getting a TypeScript compile error on my project, can you help?",
+        "expectAgentStackTop": "coding",
+        "expectActiveTopicContains": "debugging",
+        "must": [],
+        "must_not": []
+      },
+      {
+        "input": "Got it, fixed. Back to the roadmap now.",
+        "expectAgentStackTop": "planner",
+        "must": [],
+        "must_not": []
+      }
+    ]
+  },
+  {
+    "scenario": "stress_interrupt_then_returning_to_previous_topic_via_pop",
+    "turns": [
+      {
+        "input": "Let's plan out my study schedule for this semester.",
+        "expectActiveGoal": "planning_roadmap",
+        "expectAgentStackTop": "planner",
+        "must": [],
+        "must_not": []
+      },
+      {
+        "input": "Actually I'm feeling really overwhelmed and stressed about exams right now.",
+        "expectActiveGoal": "grounding_user",
+        "expectAgentStackTop": "coach",
+        "must": [],
+        "must_not": ["schedule", "deadline", "productivity"]
+      },
+      {
+        "input": "Exams and not sleeping enough, mostly.",
+        "expectAgentStackTop": "coach",
+        "must": [],
+        "must_not": []
+      },
+      {
+        "input": "Okay I feel a bit better. Let's get back to that study schedule.",
+        "expectAgentStackTop": "planner",
+        "must": [],
+        "must_not": []
+      }
+    ]
+  }
+]

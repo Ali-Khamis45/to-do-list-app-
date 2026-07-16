@@ -69,10 +69,7 @@ export class AuthenticationService implements IAuthenticationService {
       // 5. Save User
       this.userRepository.saveUser(newUser);
 
-      // 6. Seed isolated default records for the user
-      this.userRepository.seedDefaultUserData(newUser.id);
-
-      return { 
+      return {
         success: true, 
         message: 'تم إنشاء الحساب بنجاح! يمكنك الآن تسجيل الدخول',
         user: newUser

@@ -1,5 +1,6 @@
 import { BaseAgent, AgentOutput } from './BaseAgent';
 import { codingPrompt } from '../prompts/coding';
+import { SUGGEST_TASKS_TOOLS } from '../tools/suggestTasksTool';
 
 export class CodingAgent extends BaseAgent {
   name = 'CodingAgent';
@@ -7,12 +8,11 @@ export class CodingAgent extends BaseAgent {
 
   async run(prompt: string, context: string): Promise<AgentOutput> {
     const rules = [
-      `CONTEXT REFERENCE CONSTRAINT: Reference at least one prior fact from the conversation history/state.`,
       `RELEASE CONTROL: If the user indicates they are done debugging or coding (e.g. "thanks, that worked", "got it", "done coding", "go back to planning"), suggest returning control.`
     ].join('\n');
 
     const fullInstruction = `${codingPrompt}\n\n${rules}\n\nUser Workspace Context:\n${context}`;
-    const response = await this.llm.generate(prompt, fullInstruction);
+    const response = await this.llm.generate(prompt, fullInstruction, SUGGEST_TASKS_TOOLS);
     
     // Programmatic handoff check
     const lowerPrompt = prompt.toLowerCase();

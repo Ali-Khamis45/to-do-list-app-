@@ -1,5 +1,6 @@
 import { BaseAgent, AgentOutput } from './BaseAgent';
 import { researchPrompt } from '../prompts/research';
+import { SUGGEST_TASKS_TOOLS } from '../tools/suggestTasksTool';
 
 export class ResearchAgent extends BaseAgent {
   name = 'ResearchAgent';
@@ -7,7 +8,7 @@ export class ResearchAgent extends BaseAgent {
 
   async run(prompt: string, context: string): Promise<AgentOutput> {
     const fullInstruction = `${researchPrompt}\n\nUser Workspace Context:\n${context}`;
-    const response = await this.llm.generate(prompt, fullInstruction);
+    const response = await this.llm.generate(prompt, fullInstruction, SUGGEST_TASKS_TOOLS);
     return {
       agentName: this.name,
       analysis: response.text,

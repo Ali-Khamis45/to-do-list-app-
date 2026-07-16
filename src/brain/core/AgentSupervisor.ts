@@ -32,6 +32,13 @@ export class AgentSupervisor {
   /**
    * Selects agent based on the top of the DialogueState agentStack,
    * preserving conversational stack ownership.
+   *
+   * Invariant: while state.agentStack is non-empty, exactly one agent generates
+   * per turn (the stack top). This is the entirety of "agent handoff ownership" -
+   * no secondary agent can produce text or tool calls while another agent owns
+   * the stack. The 2-agent draft+refine branch in runCollaboration below is
+   * currently unreachable because this method never returns more than one agent;
+   * it's kept as a future extension point, not dead code to remove.
    */
   selectAgents(intent: IntentType, prompt: string, state?: DialogueState): BaseAgent[] {
     const selected: BaseAgent[] = [];
@@ -118,6 +125,10 @@ export class AgentSupervisor {
     };
   }
 
+  /**
+   * The multi-agent branch below (agents.length > 1) is unreachable in current
+   * usage - see the invariant note on selectAgents. Left in place intentionally.
+   */
   async runCollaboration(agents: BaseAgent[], prompt: string, context: string, _version: 'A' | 'B' = 'B'): Promise<AgentOutput> {
     const span = this.logger.startSpan('AgentSupervisor: runCollaboration', { agentsCount: agents.length });
     

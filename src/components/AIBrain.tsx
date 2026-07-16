@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { AgentPipeline } from '../brain/pipeline/AgentPipeline';
+import { ConversationManager } from '../brain/core/ConversationManager';
 import { ConfirmationEngine } from '../brain/core/ConfirmationEngine';
 import { Idea, IdeaLink, IdeaCluster, IdeaExpansion, IdeaHistoryTimelineEvent } from '../brain/types';
 import { autoClusterIdeas, searchIdeas } from '../brain/searchEngine';
@@ -17,6 +18,7 @@ import NewIdeaModal from './NewIdeaModal';
 import coachTests from '../brain/evaluation/coach_tests.json';
 import plannerTests from '../brain/evaluation/planner_tests.json';
 import codingTests from '../brain/evaluation/coding_tests.json';
+import multiTurnTests from '../brain/evaluation/multi_turn_tests.json';
 
 interface SuggestedTask {
   title: string;
@@ -45,6 +47,24 @@ interface AIBrainProps {
   onAddTask: (task: Task) => void;
   onAddGoal: (goal: Goal) => void;
   onRefreshData: () => void;
+}
+
+const GREETING_MESSAGE: ChatMessage = {
+  sender: 'ai',
+  text: 'Hey there! 👋 I\'m here to brainstorm ideas, help you sketch out plans, check in on your goals, or just talk things through if you\'re having a hectic day.\n\nHow\'s everything going with you?',
+  timestamp: new Date()
+};
+
+function getFriendlyChatErrorMessage(err: any): string {
+  const msg = err?.message ? String(err.message) : String(err);
+
+  if (/429|RESOURCE_EXHAUSTED|quota/i.test(msg)) {
+    return "I'm out of AI requests for today (free-tier limit reached) — please try again later.";
+  }
+  if (/API key is not configured|401|403|PERMISSION_DENIED/i.test(msg)) {
+    return "I'm having trouble authenticating with the AI service right now — the API key may need to be checked.";
+  }
+  return "I ran into a technical hiccup processing that — mind trying again in a moment?";
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -82,14 +102,28 @@ const AIBrain: React.FC<AIBrainProps> = ({
   const [evaluationSuite, setEvaluationSuite] = useState<'coach' | 'planner' | 'coding'>('coach');
   const [evaluationResults, setEvaluationResults] = useState<any[]>([]);
   const [evaluationSummary, setEvaluationSummary] = useState<any | null>(null);
+  const [isEvaluatingMultiTurn, setIsEvaluatingMultiTurn] = useState(false);
+  const [multiTurnResults, setMultiTurnResults] = useState<any[]>([]);
 
   // Chat States
   const [chatInput, setChatInput] = useState('');
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { sender: 'ai', text: 'Hey there! 👋 I\'m here to brainstorm ideas, help you sketch out plans, check in on your goals, or just talk things through if you\'re having a hectic day.\n\nHow\'s everything going with you?', timestamp: new Date() }
-  ]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([GREETING_MESSAGE]);
+
+  // Rehydrate persisted conversation history on mount, so switching tabs or
+  // reloading the page doesn't wipe the chat.
+  useEffect(() => {
+    const history = new ConversationManager(userId).getFullHistory(userId);
+    if (history.length > 0) {
+      setChatMessages(history.map(turn => ({
+        sender: turn.role === 'model' ? 'ai' : 'user',
+        text: turn.text,
+        timestamp: new Date(turn.timestamp)
+      })));
+    }
+  }, [userId]);
   const [pendingTasksList, setPendingTasksList] = useState<SuggestedTask[]>([]);
   const [pendingTxId, setPendingTxId] = useState<string | null>(null);
+  const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const pipelineRef = useRef<AgentPipeline | null>(null);
 
@@ -141,7 +175,7 @@ const AIBrain: React.FC<AIBrainProps> = ({
   // Auto Scroll Chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
+  }, [chatMessages, isChatLoading]);
 
   // Auto Load Expansion details if available in local storage metadata or reload
   useEffect(() => {
@@ -426,6 +460,7 @@ const AIBrain: React.FC<AIBrainProps> = ({
     const userMsg = chatInput.trim();
     setChatMessages(prev => [...prev, { sender: 'user', text: userMsg, timestamp: new Date() }]);
     setChatInput('');
+    setIsChatLoading(true);
 
     try {
       // Reuse same pipeline instance across messages to preserve
@@ -477,10 +512,12 @@ const AIBrain: React.FC<AIBrainProps> = ({
         ...prev,
         {
           sender: 'ai',
-          text: `I ran into an issue handling that: ${err.message}`,
+          text: getFriendlyChatErrorMessage(err),
           timestamp: new Date()
         }
       ]);
+    } finally {
+      setIsChatLoading(false);
     }
   };
 
@@ -535,6 +572,85 @@ const AIBrain: React.FC<AIBrainProps> = ({
     const summary = computeEvaluationSummary(results);
     setEvaluationSummary(summary);
     setIsEvaluating(false);
+  };
+
+  // Runs each multi-turn scenario sequentially against one persistent pipeline
+  // instance so agentStack/topic state carries across turns, then asserts on
+  // both the dialogue state and the usual must/must_not text checks.
+  const runMultiTurnEvaluation = async () => {
+    setIsEvaluatingMultiTurn(true);
+    setMultiTurnResults([]);
+
+    const evalUserId = `${userId}__eval_seq`;
+    localStorage.removeItem(`nexus_dlg_state_${evalUserId}`);
+
+    const results: any[] = [];
+
+    for (const scenario of multiTurnTests as any[]) {
+      const pipeline = new AgentPipeline(evalUserId, { onAddTask, onAddGoal, onSaveIdea });
+      const turnResults: any[] = [];
+
+      for (const turn of scenario.turns) {
+        let response: any = null;
+        let error: string | null = null;
+        try {
+          response = await pipeline.execute({
+            userId: evalUserId,
+            userMessage: turn.input,
+            promptVersion: 'B',
+            contextParams: { tasks, goals, habits, ideas },
+            callbacks: { onAddTask, onAddGoal, onSaveIdea }
+          });
+        } catch (err: any) {
+          error = err.message;
+        }
+
+        const state = pipeline.getDialogueState();
+        const text = response?.text || '';
+        const checks: { label: string; passed: boolean }[] = [];
+
+        if (turn.expectActiveGoal) {
+          checks.push({ label: `activeGoal=${turn.expectActiveGoal}`, passed: state.activeGoal === turn.expectActiveGoal });
+        }
+        if (turn.expectAgentStackTop) {
+          const top = state.agentStack[state.agentStack.length - 1];
+          checks.push({ label: `stackTop=${turn.expectAgentStackTop}`, passed: top === turn.expectAgentStackTop });
+        }
+        if (turn.expectAgentStack) {
+          checks.push({ label: `stack=[${turn.expectAgentStack.join(',')}]`, passed: JSON.stringify(state.agentStack) === JSON.stringify(turn.expectAgentStack) });
+        }
+        if (turn.expectActiveTopicContains) {
+          checks.push({ label: `topic~"${turn.expectActiveTopicContains}"`, passed: (state.activeTopic || '').toLowerCase().includes(turn.expectActiveTopicContains.toLowerCase()) });
+        }
+        (turn.must || []).forEach((k: string) => {
+          checks.push({ label: `MUST: ${k}`, passed: text.toLowerCase().includes(k.toLowerCase()) });
+        });
+        (turn.must_not || []).forEach((k: string) => {
+          checks.push({ label: `MUST NOT: ${k}`, passed: !text.toLowerCase().includes(k.toLowerCase()) });
+        });
+
+        turnResults.push({
+          input: turn.input,
+          text,
+          error,
+          agentStack: [...state.agentStack],
+          activeTopic: state.activeTopic,
+          activeGoal: state.activeGoal,
+          checks,
+          passed: checks.every(c => c.passed)
+        });
+      }
+
+      results.push({
+        scenario: scenario.scenario,
+        turns: turnResults,
+        passed: turnResults.every(t => t.passed)
+      });
+
+      setMultiTurnResults([...results]);
+    }
+
+    setIsEvaluatingMultiTurn(false);
   };
 
   const runSingleTest = async (testCase: any, version: 'A' | 'B') => {
@@ -946,6 +1062,15 @@ const AIBrain: React.FC<AIBrainProps> = ({
                   )}
                 </div>
               ))}
+              {isChatLoading && (
+                <div className="flex justify-start">
+                  <div className="max-w-[85%] rounded-xl rounded-tl-none px-3 py-2.5 bg-stone-800/80 border border-stone-800 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:-0.3s]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:-0.15s]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce" />
+                  </div>
+                </div>
+              )}
               <div ref={chatEndRef} />
             </div>
 
@@ -956,14 +1081,20 @@ const AIBrain: React.FC<AIBrainProps> = ({
                 placeholder='e.g. "I have: gym, read, call John" or "show my ideas"'
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSendChatMessage()}
-                className="flex-1 bg-stone-950/60 border border-stone-850 rounded-xl px-3 py-2 text-xs text-stone-200 focus:outline-none focus:border-amber-500"
+                onKeyDown={e => e.key === 'Enter' && !isChatLoading && handleSendChatMessage()}
+                disabled={isChatLoading}
+                className="flex-1 bg-stone-950/60 border border-stone-850 rounded-xl px-3 py-2 text-xs text-stone-200 focus:outline-none focus:border-amber-500 disabled:opacity-50"
               />
               <button
                 onClick={handleSendChatMessage}
-                className="p-2 bg-amber-500 hover:bg-amber-600 text-stone-950 rounded-xl transition-all flex-shrink-0"
+                disabled={isChatLoading}
+                className="p-2 bg-amber-500 hover:bg-amber-600 disabled:bg-stone-800 disabled:cursor-not-allowed text-stone-950 rounded-xl transition-all flex-shrink-0"
               >
-                <Send className="w-3.5 h-3.5" />
+                {isChatLoading ? (
+                  <span className="inline-block w-3.5 h-3.5 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
               </button>
             </div>
           </div>
@@ -1622,6 +1753,66 @@ const AIBrain: React.FC<AIBrainProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Multi-Turn Conversation Suite */}
+              <div className="space-y-4 border-t border-stone-800 pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider">Multi-Turn Continuity Suite</h4>
+                    <p className="text-[11px] text-stone-500">Runs each scenario turn-by-turn against one persistent session, checking agent stack / topic continuity.</p>
+                  </div>
+                  <button
+                    onClick={runMultiTurnEvaluation}
+                    disabled={isEvaluatingMultiTurn}
+                    className="flex items-center gap-2 px-4 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:bg-stone-800 disabled:text-stone-500 text-stone-950 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                  >
+                    {isEvaluatingMultiTurn ? 'Running...' : 'Run Multi-Turn Suite'}
+                  </button>
+                </div>
+
+                {multiTurnResults.length > 0 && (
+                  <div className="space-y-3">
+                    {multiTurnResults.map((scenarioResult, sIdx) => (
+                      <div key={sIdx} className="bg-stone-950/40 border border-stone-850 p-4 rounded-2xl space-y-3">
+                        <div className="flex items-center justify-between border-b border-stone-900 pb-2">
+                          <span className="text-sm font-semibold text-stone-200">{scenarioResult.scenario}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                            scenarioResult.passed ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                          }`}>
+                            {scenarioResult.passed ? 'PASSED' : 'FAILED'}
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          {scenarioResult.turns.map((turn: any, tIdx: number) => (
+                            <div key={tIdx} className="bg-stone-900/10 p-3 rounded-xl border border-stone-900 space-y-1.5">
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="text-xs text-stone-300">Turn {tIdx + 1}: "{turn.input}"</span>
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold shrink-0 ${
+                                  turn.passed ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                                }`}>
+                                  {turn.passed ? 'OK' : 'FAIL'}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-stone-500 font-mono">
+                                stack: [{turn.agentStack.join(', ')}] · topic: {turn.activeTopic}
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {turn.checks.map((c: any, cIdx: number) => (
+                                  <span key={cIdx} className={`text-[9px] px-1.5 py-0.5 rounded border font-mono ${
+                                    c.passed ? 'text-emerald-400 border-emerald-950 bg-stone-900' : 'text-red-400 border-red-950 bg-stone-900'
+                                  }`}>
+                                    {c.label}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

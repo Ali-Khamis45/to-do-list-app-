@@ -1,4 +1,5 @@
 import { BaseAgent, AgentOutput } from './BaseAgent';
+import { SUGGEST_TASKS_TOOLS } from '../tools/suggestTasksTool';
 
 export class GoalAgent extends BaseAgent {
   name = 'GoalAgent';
@@ -6,7 +7,7 @@ export class GoalAgent extends BaseAgent {
 
   async run(prompt: string, context: string): Promise<AgentOutput> {
     const instruction = `You are a goal tracking assistant. Help the user measure progress, complete milestones, and stay ahead.\n\nContext:\n${context}`;
-    const response = await this.llm.generate(prompt, instruction);
+    const response = await this.llm.generate(prompt, instruction, SUGGEST_TASKS_TOOLS);
     return {
       agentName: this.name,
       analysis: response.text,
@@ -23,7 +24,7 @@ export class TaskAgent extends BaseAgent {
 
   async run(prompt: string, context: string): Promise<AgentOutput> {
     const instruction = `You are a task organizer. Help the user prioritize their daily task checklist.\n\nContext:\n${context}`;
-    const response = await this.llm.generate(prompt, instruction);
+    const response = await this.llm.generate(prompt, instruction, SUGGEST_TASKS_TOOLS);
     return {
       agentName: this.name,
       analysis: response.text,
@@ -40,7 +41,7 @@ export class IdeaAgent extends BaseAgent {
 
   async run(prompt: string, context: string): Promise<AgentOutput> {
     const instruction = `You are a creative brainstorming partner. Help the user write, refine, and connect their ideas.\n\nContext:\n${context}`;
-    const response = await this.llm.generate(prompt, instruction);
+    const response = await this.llm.generate(prompt, instruction, SUGGEST_TASKS_TOOLS);
     return {
       agentName: this.name,
       analysis: response.text,
@@ -57,7 +58,7 @@ export class CalendarAgent extends BaseAgent {
 
   async run(prompt: string, context: string): Promise<AgentOutput> {
     const instruction = `You are a schedule planner. Coordinate date mappings, agendas, and time management.\n\nContext:\n${context}`;
-    const response = await this.llm.generate(prompt, instruction);
+    const response = await this.llm.generate(prompt, instruction, SUGGEST_TASKS_TOOLS);
     return {
       agentName: this.name,
       analysis: response.text,

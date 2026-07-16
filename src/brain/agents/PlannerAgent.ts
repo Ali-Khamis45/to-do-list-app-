@@ -1,5 +1,6 @@
 import { BaseAgent, AgentOutput } from './BaseAgent';
 import { plannerPrompt } from '../prompts/planner';
+import { SUGGEST_TASKS_TOOLS } from '../tools/suggestTasksTool';
 
 export class PlannerAgent extends BaseAgent {
   name = 'PlannerAgent';
@@ -7,13 +8,12 @@ export class PlannerAgent extends BaseAgent {
 
   async run(prompt: string, context: string): Promise<AgentOutput> {
     const rules = [
-      `CONTEXT REFERENCE CONSTRAINT: Reference at least one prior fact from the conversation history/state (e.g., the goals, projects, or stress they mentioned previously).`,
       `HANDOFF RULE: If the user asks a specific programming or coding question (e.g. React hooks, TypeScript compilation), suggest transferring to the coding agent.`,
       `RELEASE CONTROL: If the user indicates they want to stop planning or return to general chat, suggest returning control.`
     ].join('\n');
 
     const fullInstruction = `${plannerPrompt}\n\n${rules}\n\nUser Workspace Context:\n${context}`;
-    const response = await this.llm.generate(prompt, fullInstruction);
+    const response = await this.llm.generate(prompt, fullInstruction, SUGGEST_TASKS_TOOLS);
     
     // Programmatic handoff checks
     const lowerPrompt = prompt.toLowerCase();

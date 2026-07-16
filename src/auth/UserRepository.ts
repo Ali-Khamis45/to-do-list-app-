@@ -859,8 +859,5 @@ export class UserRepository implements IUserRepository {
 
     let links = this.getTable<RelationalIdeaLink>('idea_links').filter(l => l.userId !== userId);
     this.saveTable('idea_links', links);
-
-    // Re-seed default pristine empty structure or clean default state for user
-    this.seedDefaultUserData(userId);
   }
 }
